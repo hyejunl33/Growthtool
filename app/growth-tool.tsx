@@ -60,8 +60,6 @@ const initialProduct: Product = {
   image: "/demo-product.png",
 };
 
-const initialCreatives: Creative[] = [];
-
 function sparkPath(values: number[]) {
   const max = Math.max(...values);
   const min = Math.min(...values);
@@ -77,6 +75,12 @@ const creativeStyles: Record<Creative["id"], Pick<Creative, "background" | "acce
   B: { background: "#f3eee6", accent: "#2f2923" },
   C: { background: "#f3eee6", accent: "#2f2923" },
 };
+
+const initialCreatives: Creative[] = [
+  { id: "A", headline: "그로우 수분 장벽 세럼\n투명한 젤 제형", subline: "30ml · 무향 · 투명한 젤 제형", cta: "자세히 보기", status: "통과", image: "/demo-creative.webp", ...creativeStyles.A },
+  { id: "B", headline: "무향으로 가볍게\n매일 쓰는 젤 세럼", subline: "30ml · 무향 · 투명한 젤 제형", cta: "자세히 보기", status: "통과", image: "/demo-creative.webp", ...creativeStyles.B },
+  { id: "C", headline: "가볍게 덜어 바르는\n투명 젤 세럼", subline: "30ml · 무향 · 투명한 젤 제형", cta: "자세히 보기", status: "통과", image: "/demo-creative.webp", ...creativeStyles.C },
+];
 
 function presentVariants(variants: CreativeVariant[]): Creative[] {
   const fixedSubline = variants[0]?.subline || "확인된 상품 특징";
@@ -117,6 +121,7 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
   const [product, setProduct] = useState<Product>({ ...initialProduct, ...storedState.product, image: storedState.product?.image || initialProduct.image });
   const [productFile, setProductFile] = useState<File | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>(initialCreatives);
+  const [hasGenerated, setHasGenerated] = useState(false);
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
   const [notice, setNotice] = useState("실데이터 연결 상태를 확인하고 있어요.");
   const [performanceFeed, setPerformanceFeed] = useState<PerformanceFeed | null>(null);
@@ -253,6 +258,7 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
       const next = presentVariants(result.data.variants).map((creative) => productReview.status === "차단" ? { ...creative, image: imageResult.data.image, status: "차단" as const, finding: productReview.findings[0]?.message } : { ...creative, image: imageResult.data.image });
       const blocked = next.some((creative) => creative.status === "차단");
       setCreatives(next);
+      setHasGenerated(true);
       setNotice(blocked
         ? "검토에서 차단 표현을 발견했어요. 문구를 수정해야 내보낼 수 있어요."
         : "OpenAI가 실제 제품 사진을 편집하고 카피 3종을 만들었어요.");
@@ -373,7 +379,7 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
         <div className="notice" role="status"><Sparkles size={16} />{notice}</div>
 
         {activeTab === "dashboard" && <Dashboard trends={trends} feed={trendFeed} savedTrends={savedTrends} selectedTrend={selectedTrend} onSave={saveTrend} onSelect={setSelectedTrend} onStart={startStudio} />}
-        {activeTab === "studio" && <Studio product={product} selectedTrend={selectedTrend} creatives={creatives} fileRef={fileRef} judgeMode={judgeMode} judgeCode={judgeCode} onJudgeCode={setJudgeCode} onProduct={setProduct} onImage={handleFile} onGenerate={generate} onEdit={setSelectedCreative} onExport={exportCreative} />}
+        {activeTab === "studio" && <Studio product={product} selectedTrend={selectedTrend} creatives={creatives} isDemo={!hasGenerated} fileRef={fileRef} judgeMode={judgeMode} judgeCode={judgeCode} onJudgeCode={setJudgeCode} onProduct={setProduct} onImage={handleFile} onGenerate={generate} onEdit={setSelectedCreative} onExport={exportCreative} />}
         {activeTab === "performance" && <Performance feed={performanceFeed} loading={performanceLoading} onRefresh={refreshPerformance} />}
       </section>
 
@@ -390,7 +396,7 @@ function Dashboard({ trends, feed, savedTrends, selectedTrend, onSave, onSelect,
   </div>;
 }
 
-function Studio({ product, selectedTrend, creatives, fileRef, judgeMode, judgeCode, onJudgeCode, onProduct, onImage, onGenerate, onEdit, onExport }: { product: Product; selectedTrend?: Trend; creatives: Creative[]; fileRef: React.RefObject<HTMLInputElement | null>; judgeMode: boolean; judgeCode: string; onJudgeCode: (value: string) => void; onProduct: React.Dispatch<React.SetStateAction<Product>>; onImage: (event: ChangeEvent<HTMLInputElement>) => void; onGenerate: (event: FormEvent) => void; onEdit: (creative: Creative) => void; onExport: (creative: Creative) => void }) {
+function Studio({ product, selectedTrend, creatives, isDemo, fileRef, judgeMode, judgeCode, onJudgeCode, onProduct, onImage, onGenerate, onEdit, onExport }: { product: Product; selectedTrend?: Trend; creatives: Creative[]; isDemo: boolean; fileRef: React.RefObject<HTMLInputElement | null>; judgeMode: boolean; judgeCode: string; onJudgeCode: (value: string) => void; onProduct: React.Dispatch<React.SetStateAction<Product>>; onImage: (event: ChangeEvent<HTMLInputElement>) => void; onGenerate: (event: FormEvent) => void; onEdit: (creative: Creative) => void; onExport: (creative: Creative) => void }) {
   return (
     <div className="studio-grid">
       <section className="brief-panel">
@@ -409,8 +415,8 @@ function Studio({ product, selectedTrend, creatives, fileRef, judgeMode, judgeCo
         </form>
       </section>
       <section className="creative-panel">
-        <div className="section-heading"><div><p className="eyebrow">2. AI CREATIVE · 3 VARIANTS</p><h2>생성된 소재</h2></div>{creatives.length > 0 && <span className="status-dot"><span />실제 생성 완료</span>}</div>
-        <p className="panel-intro">OpenAI가 실제 제품 사진으로 키 비주얼을 만들고, 동일 이미지에서 헤드라인만 비교합니다.</p>
+        <div className="section-heading"><div><p className="eyebrow">2. AI CREATIVE · 3 VARIANTS</p><h2>생성된 소재</h2></div>{creatives.length > 0 && <span className="status-dot"><span />{isDemo ? "데모 미리보기" : "실제 생성 완료"}</span>}</div>
+        <p className="panel-intro">{isDemo ? "기본 데모 소재예요. 생성 버튼을 누르면 선택한 트렌드와 제품 정보로 교체됩니다." : "OpenAI가 실제 제품 사진으로 키 비주얼을 만들고, 동일 이미지에서 헤드라인만 비교합니다."}</p>
         {creatives.length ? <div className="creative-grid">{creatives.map((creative) => (
           <article className="creative-card" key={creative.id}>
             <CreativePreview creative={creative} product={product} />
