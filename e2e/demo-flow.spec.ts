@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("shows only real-provider connection states when credentials are absent", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "오늘의 기회" })).toBeVisible();
+  await expect(page.getByText("연결 확인 필요", { exact: true })).toBeVisible();
   await expect(page.getByText("표시할 실데이터가 없어요")).toBeVisible();
   await expect(page.getByText("루미에르 소프트 재킷")).toHaveCount(0);
 
