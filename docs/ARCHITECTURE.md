@@ -79,11 +79,11 @@ Creative Center는 사용자에게 공식 출처 링크를 제공한다. 문서�
 2. 인증 배포에서는 signed upload ticket으로 원본을 private Storage에 올린다.
 3. 서버가 Sharp로 실제 디코딩, 치수, MIME을 검증한다.
 4. Responses API가 확인 사실에 제한된 A/B/C 카피를 구조화 출력한다.
-5. Images Edit가 같은 제품 사진으로 정사각형 키 비주얼 한 장을 만든다.
+5. Images Edit의 `gpt-image-2`, `input_fidelity: high`가 같은 제품 사진으로 정사각형 키 비주얼 한 장을 만든다.
 6. 세 안은 같은 키 비주얼, 보조 문구, CTA를 공유하고 헤드라인만 다르게 한다.
 7. 금지 표현 검토 후 Canvas가 1080×1080 PNG를 렌더링한다.
 
-OpenAI 키가 없으면 `/api/creatives`와 `/api/creative-image`는 503을 반환한다. 서버는 데모 소재를 만들지 않는다.
+OpenAI 키가 없으면 `/api/creatives`와 `/api/creative-image`는 503을 반환한다. 서버는 데모 소재를 만들지 않는다. 심사용 배포는 8자 이상의 `JUDGE_ACCESS_CODE`를 서버에 두고 동일 코드를 `X-Judge-Access-Code` 헤더로 보낸 요청만 허용한다. 이 모드에서는 사용자 입력을 영속 저장하지 않는다.
 
 ## Performance adapters
 
@@ -132,9 +132,10 @@ OAuth refresh token으로 access token을 발급하고 Google Ads REST v25 `goog
 
 필수 CI: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm test:e2e`.
 
-출시 전에는 fixture 테스트 외에 실제 계정으로 다음을 확인한다.
+심사용 MVP 출시 전에는 fixture 테스트 외에 실제 계정으로 다음을 확인한다.
 
 1. Naver 또는 X 실트렌드 한 건 이상.
 2. 실제 제품 사진의 OpenAI Images Edit 성공과 패키지 보존 검수.
-3. 광고 플랫폼 한 곳 이상의 실제 일별 행과 관리자 UI 대조.
-4. 잘못된 token, 만료 token, 권한 부족, 0행, 다른 통화 상태.
+3. 체험 코드가 없는 AI 요청의 거부와 외부 브라우저에서 PNG/ZIP 다운로드.
+
+광고 플랫폼 실제 일별 행, 잘못된 token, 만료 token, 권한 부족, 0행, 다른 통화 상태는 심사용 MVP 이후 검증한다.

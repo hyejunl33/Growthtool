@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 import { hasSupabaseConfig } from "../lib/supabase/config";
 import { createClient } from "../lib/supabase/server";
 import { getCurrentWorkspace } from "../lib/workspace";
+import { hasJudgeAccessConfigured } from "../lib/judge-access";
 
 export default async function Home() {
   let workspaceSummary: { brandName: string; category: string; quotaUsed: number } | undefined;
-  if (hasSupabaseConfig()) {
+  const judgeMode = hasJudgeAccessConfigured();
+  if (hasSupabaseConfig() && !judgeMode) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
     if (!data.user) redirect("/login");
@@ -19,5 +21,5 @@ export default async function Home() {
     if (!brand?.onboarding_completed_at) redirect("/onboarding");
     workspaceSummary = { brandName: brand.name, category: brand.category, quotaUsed: typeof quotaUsed === "number" ? quotaUsed : 0 };
   }
-  return <GrowthTool persistenceEnabled={hasSupabaseConfig()} workspaceSummary={workspaceSummary} />;
+  return <GrowthTool persistenceEnabled={hasSupabaseConfig() && !judgeMode} judgeMode={judgeMode} workspaceSummary={workspaceSummary} />;
 }

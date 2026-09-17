@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI, { toFile } from "openai";
 import { hasSupabaseConfig } from "../../../lib/supabase/config";
 import { createClient } from "../../../lib/supabase/server";
+import { hasValidJudgeAccess } from "../../../lib/judge-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,11 +11,12 @@ const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 export async function POST(request: Request) {
   if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: "OPENAI_IMAGE_NOT_CONFIGURED" }, { status: 503 });
-  if (hasSupabaseConfig()) {
+  const judgeAccess = hasValidJudgeAccess(request);
+  if (hasSupabaseConfig() && !judgeAccess) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
     if (!data.user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  } else if (process.env.NODE_ENV === "production") {
+  } else if (!judgeAccess && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "AUTH_REQUIRED_FOR_AI" }, { status: 503 });
   }
   const form = await request.formData();
