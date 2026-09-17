@@ -5,7 +5,7 @@ import { getCurrentWorkspace } from "../../../lib/workspace";
 
 const brandSchema = z.object({
   name: z.string().trim().min(1).max(80),
-  category: z.enum(["fashion", "beauty"]),
+  category: z.literal("beauty"),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   forbiddenTerms: z.array(z.string().trim().min(1).max(40)).max(30),
 });

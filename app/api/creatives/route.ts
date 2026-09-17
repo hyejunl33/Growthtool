@@ -15,6 +15,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "INVALID_CREATIVE_INPUT", fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
+  if (process.env.OPENAI_API_KEY && !hasSupabaseConfig() && process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "AUTH_REQUIRED_FOR_AI" }, { status: 503 });
+  }
+
   if (hasSupabaseConfig()) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
@@ -59,6 +63,7 @@ export async function POST(request: Request) {
     if (persistence) {
       await persistence.supabase.from("generation_jobs").update({ status: "failed", error_code: "CREATIVE_GENERATION_FAILED", completed_at: new Date().toISOString() }).eq("id", persistence.jobId).eq("workspace_id", persistence.workspaceId);
     }
-    return NextResponse.json({ error: "CREATIVE_GENERATION_FAILED" }, { status: 502 });
+    const code = error instanceof Error && error.message === "OPENAI_NOT_CONFIGURED" ? "OPENAI_NOT_CONFIGURED" : "CREATIVE_GENERATION_FAILED";
+    return NextResponse.json({ error: code }, { status: code === "OPENAI_NOT_CONFIGURED" ? 503 : 502 });
   }
 }

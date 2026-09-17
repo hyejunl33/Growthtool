@@ -1,6 +1,19 @@
 # Growth tool — MVP 개발 백로그
 
-버전 1.0 / 2026-09-17 / 1인·8주 기준. [PRD](PRD.md)와 [기술 설계](ARCHITECTURE.md)를 함께 읽는다. `Txx`는 문서의 안정적인 작업 ID이며 GitHub 이슈 번호와 구분한다. 기계적으로 활용할 원본은 [issues.json](issues.json)이다.
+버전 2.0 / 2026-09-17 / 1인·8주 기준. [PRD](PRD.md)와 [기술 설계](ARCHITECTURE.md)를 함께 읽는다. `Txx`는 문서의 안정적인 작업 ID이며 GitHub 이슈 번호와 구분한다. 아래 기존 T01~T24 중 CSV·패션·데모 fallback 언급은 v1 기록이며, 현재 구현에는 다음 변경 작업이 우선한다.
+
+## v2 우선 변경 작업
+
+| ID | 작업 | 상태 | 완료 조건 |
+|---|---|---|---|
+| V201 | 뷰티 전용 범위와 빈 상태 | 구현 | 패션 고정값·루미에르·샘플 트렌드·샘플 소재 없음 |
+| V202 | Naver/X/TikTok 실트렌드 어댑터 | 구현, 자격증명 대기 | 공급자별 live/unconfigured/error와 출처 표시 |
+| V203 | 실제 제품 이미지 AI 생성 | 구현, OpenAI key 대기 | Images Edit가 업로드 파일을 받고 샘플 fallback 없음 |
+| V204 | 광고 플랫폼 성과 커넥터 | 구현, 실계정 검증 대기 | Meta/TikTok/Google Ads/Moloco 일별 행 정규화 |
+| V205 | CSV 성과 경로 제거 | 구현 | UI와 API가 플랫폼 직접 조회만 제공 |
+| V206 | 실계정 출시 게이트 | 대기 | 트렌드 1곳, OpenAI 이미지, 광고 플랫폼 1곳 외부 URL smoke |
+
+`V206`이 끝나기 전에는 MVP 구현 완료로 표시하지 않는다. GitHub 기존 이슈의 CSV 작업은 폐기하고 해당 플랫폼 연결 이슈로 대체한다.
 
 ## 실행 원칙
 

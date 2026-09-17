@@ -1,18 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createFallbackVariants, creativeRequestSchema } from "../lib/creative";
+import { creativeRequestSchema } from "../lib/creative";
 
 describe("creative brief", () => {
-  it("creates three distinct, ordered variants from confirmed facts", () => {
+  it("accepts a beauty product brief with confirmed facts and a live trend", () => {
     const input = creativeRequestSchema.parse({
-      product: { name: "소프트 재킷", category: "여성 아우터", price: "129000", facts: "가벼운 세미 오버핏, 베이지 컬러" },
-      trend: { title: "가을 출근룩", category: "패션의류", description: "검색 관심 증가" },
+      product: { name: "수분 장벽 세럼", category: "세럼·앰플", price: "29000", facts: "30ml, 무향, 투명한 젤 제형" },
+      trend: { title: "장벽 케어", category: "뷰티", description: "네이버 쇼핑 상대 클릭 증가" },
     });
-    const variants = createFallbackVariants(input);
-    expect(variants.map((variant) => variant.id)).toEqual(["A", "B", "C"]);
-    expect(variants).toHaveLength(3);
-    expect(variants.every((variant) => variant.subline.includes("가벼운 세미 오버핏"))).toBe(true);
-    expect(new Set(variants.map((variant) => variant.cta)).size).toBe(1);
-    expect(new Set(variants.map((variant) => variant.subline)).size).toBe(1);
+    expect(input.product.name).toBe("수분 장벽 세럼");
+    expect(input.trend?.category).toBe("뷰티");
   });
 
   it("rejects an empty fact field", () => {
