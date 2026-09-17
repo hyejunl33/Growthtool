@@ -21,17 +21,9 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-
-type Trend = {
-  id: string;
-  title: string;
-  category: string;
-  growth: number;
-  score: number;
-  description: string;
-  color: string;
-  values: number[];
-};
+import { calculatePerformance, parseMetricsCsv, type Metric } from "../lib/metrics";
+import { demoTrends, type Trend, type TrendFeed } from "../lib/trends";
+import { ActionButton } from "../seed-design/ui/action-button";
 
 type Product = {
   name: string;
@@ -51,21 +43,6 @@ type Creative = {
   status: "통과" | "확인 필요" | "차단";
   finding?: string;
 };
-
-type Metric = {
-  impressions: number;
-  clicks: number;
-  spend: number;
-  purchases?: number;
-  revenue?: number;
-};
-
-const trends: Trend[] = [
-  { id: "t1", title: "가을 출근룩", category: "패션의류", growth: 43, score: 94, description: "간절기 레이어드와 출근 코디 탐색이 함께 늘고 있어요.", color: "#e8c5aa", values: [28, 31, 26, 36, 39, 53, 67] },
-  { id: "t2", title: "글로우 베이스", category: "화장품/미용", growth: 28, score: 87, description: "건조한 계절 전환기에 광채·보습 베이스 관심이 높아졌어요.", color: "#c7c7ea", values: [32, 34, 37, 39, 48, 55, 60] },
-  { id: "t3", title: "스웨이드 재킷", category: "패션의류", growth: 21, score: 82, description: "소재 중심의 검색 신호가 이어지고 있어요.", color: "#d8c3aa", values: [40, 41, 45, 46, 49, 54, 57] },
-  { id: "t4", title: "저자극 클렌징", category: "화장품/미용", growth: 16, score: 77, description: "민감 피부 루틴을 찾는 신호예요. 효능 표현은 확인이 필요해요.", color: "#b7d9cc", values: [38, 37, 42, 43, 44, 48, 51] },
-];
 
 const initialProduct: Product = {
   name: "루미에르 소프트 재킷",
@@ -105,29 +82,6 @@ function metricValue(value?: number) {
   return value === undefined || Number.isNaN(value) ? "—" : value.toLocaleString("ko-KR");
 }
 
-function parseMetrics(text: string): Metric | null {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return null;
-  const headers = lines[0].split(",").map((item) => item.trim().toLowerCase());
-  const find = (names: string[]) => headers.findIndex((header) => names.includes(header));
-  const impressionsIndex = find(["impressions", "노출"]);
-  const clicksIndex = find(["link_clicks", "clicks", "클릭"]);
-  const spendIndex = find(["spend", "비용"]);
-  if ([impressionsIndex, clicksIndex, spendIndex].some((index) => index < 0)) return null;
-  const purchaseIndex = find(["purchases", "구매"]);
-  const revenueIndex = find(["purchase_value", "revenue", "구매금액"]);
-  const total: Metric = { impressions: 0, clicks: 0, spend: 0 };
-  for (const line of lines.slice(1)) {
-    const row = line.split(",").map((item) => Number(item.replace(/[^0-9.-]/g, "")) || 0);
-    total.impressions += row[impressionsIndex] || 0;
-    total.clicks += row[clicksIndex] || 0;
-    total.spend += row[spendIndex] || 0;
-    if (purchaseIndex >= 0) total.purchases = (total.purchases || 0) + (row[purchaseIndex] || 0);
-    if (revenueIndex >= 0) total.revenue = (total.revenue || 0) + (row[revenueIndex] || 0);
-  }
-  return total;
-}
-
 function readSavedState(): { product?: Product; creatives?: Creative[]; savedTrends?: string[] } {
   if (typeof window === "undefined") return {};
   try {
@@ -140,8 +94,10 @@ function readSavedState(): { product?: Product; creatives?: Creative[]; savedTre
 export default function GrowthTool() {
   const [storedState] = useState(readSavedState);
   const [activeTab, setActiveTab] = useState<"dashboard" | "studio" | "performance">("dashboard");
+  const [trends, setTrends] = useState<Trend[]>(demoTrends);
+  const [trendProvider, setTrendProvider] = useState<TrendFeed["provider"]>("demo");
   const [savedTrends, setSavedTrends] = useState<string[]>(storedState.savedTrends || ["t1"]);
-  const [selectedTrend, setSelectedTrend] = useState<Trend | undefined>(trends[0]);
+  const [selectedTrend, setSelectedTrend] = useState<Trend | undefined>(demoTrends[0]);
   const [product, setProduct] = useState<Product>(storedState.product || initialProduct);
   const [creatives, setCreatives] = useState<Creative[]>(storedState.creatives || initialCreatives);
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
@@ -154,15 +110,24 @@ export default function GrowthTool() {
     localStorage.setItem("growth-tool-state", JSON.stringify({ product, creatives, savedTrends }));
   }, [product, creatives, savedTrends]);
 
-  const performance = useMemo(() => {
-    if (!metrics) return null;
-    return {
-      ctr: metrics.impressions ? (metrics.clicks / metrics.impressions) * 100 : null,
-      cpc: metrics.clicks ? metrics.spend / metrics.clicks : null,
-      cvr: metrics.clicks && metrics.purchases !== undefined ? (metrics.purchases / metrics.clicks) * 100 : null,
-      roas: metrics.spend && metrics.revenue !== undefined ? metrics.revenue / metrics.spend : null,
-    };
-  }, [metrics]);
+  useEffect(() => {
+    let live = true;
+    void fetch("/api/trends", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<TrendFeed> : Promise.reject(new Error("TREND_FETCH_FAILED")))
+      .then((feed) => {
+        if (!live || feed.trends.length === 0) return;
+        setTrends(feed.trends);
+        setTrendProvider(feed.provider);
+        setSelectedTrend((current) => feed.trends.find((trend) => trend.id === current?.id) || feed.trends[0]);
+        if (feed.message) setNotice(feed.message);
+      })
+      .catch(() => {
+        if (live) setNotice("트렌드 API에 연결하지 못해 데모 신호를 표시하고 있어요.");
+      });
+    return () => { live = false; };
+  }, []);
+
+  const performance = useMemo(() => metrics ? calculatePerformance(metrics) : null, [metrics]);
 
   function saveTrend(trend: Trend) {
     setSavedTrends((current) => current.includes(trend.id) ? current.filter((id) => id !== trend.id) : [...current, trend.id]);
@@ -228,7 +193,7 @@ export default function GrowthTool() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const result = parseMetrics(String(reader.result || ""));
+      const result = parseMetricsCsv(String(reader.result || ""));
       if (!result) {
         setCsvError("필수 열이 필요해요: impressions, link_clicks/clicks, spend.");
         return;
@@ -259,7 +224,7 @@ export default function GrowthTool() {
         <header className="topbar"><div><p className="eyebrow">PERFORMANCE CREATIVE OS</p><h1>{activeTab === "dashboard" ? "오늘의 기회" : activeTab === "studio" ? "크리에이티브 스튜디오" : "내 광고 성과"}</h1></div><button className="outline-button" onClick={() => { localStorage.removeItem("growth-tool-state"); window.location.reload(); }}><Clock3 size={16} />데모 초기화</button></header>
         <div className="notice" role="status"><Sparkles size={16} />{notice}</div>
 
-        {activeTab === "dashboard" && <Dashboard trends={trends} savedTrends={savedTrends} selectedTrend={selectedTrend} onSave={saveTrend} onSelect={setSelectedTrend} onStart={startStudio} />}
+        {activeTab === "dashboard" && <Dashboard trends={trends} provider={trendProvider} savedTrends={savedTrends} selectedTrend={selectedTrend} onSave={saveTrend} onSelect={setSelectedTrend} onStart={startStudio} />}
         {activeTab === "studio" && <Studio product={product} selectedTrend={selectedTrend} creatives={creatives} fileRef={fileRef} onProduct={setProduct} onImage={handleFile} onGenerate={generate} onEdit={setSelectedCreative} onExport={exportCreative} />}
         {activeTab === "performance" && <Performance metrics={metrics} performance={performance} error={csvError} onCsv={handleCsv} />}
       </section>
@@ -269,10 +234,10 @@ export default function GrowthTool() {
   );
 }
 
-function Dashboard({ trends, savedTrends, selectedTrend, onSave, onSelect, onStart }: { trends: Trend[]; savedTrends: string[]; selectedTrend?: Trend; onSave: (trend: Trend) => void; onSelect: (trend: Trend) => void; onStart: (trend?: Trend) => void }) {
+function Dashboard({ trends, provider, savedTrends, selectedTrend, onSave, onSelect, onStart }: { trends: Trend[]; provider: TrendFeed["provider"]; savedTrends: string[]; selectedTrend?: Trend; onSave: (trend: Trend) => void; onSelect: (trend: Trend) => void; onStart: (trend?: Trend) => void }) {
   return <div className="dashboard-grid">
-    <section className="hero-card"><div><p className="eyebrow">09.17 WED · FASHION & BEAUTY</p><h2>트렌드는 매일 바뀌고,<br />소재는 더 빨리 피로해집니다.</h2><p>오늘의 쇼핑 신호를 바로 A/B 테스트용 기획으로 바꾸세요.</p><button className="primary-button" onClick={() => onStart(selectedTrend)}><Sparkles size={17} />{selectedTrend ? `“${selectedTrend.title}”로 제작` : "소재 만들기"}<ChevronRight size={17} /></button></div><div className="hero-orb"><Flame size={58} /><span>+{selectedTrend?.growth || 0}%<small>최근 3일 변화</small></span></div></section>
-    <section className="signal-panel"><div className="section-heading"><div><p className="eyebrow">SHOPPING INSIGHT</p><h2>카테고리 신호</h2></div><span className="fresh"><span />9월 16일 기준</span></div><div className="signal-bars"><div><span>패션의류</span><i style={{ width: "88%" }} /><b>88</b></div><div><span>화장품/미용</span><i style={{ width: "64%" }} /><b>64</b></div><div><span>패션잡화</span><i style={{ width: "47%" }} /><b>47</b></div></div><p className="source-note">네이버 쇼핑 클릭 상대지수입니다. 서로 다른 조회 묶음의 값을 절대량으로 비교하지 마세요.</p></section>
+    <section className="hero-card"><div><p className="eyebrow">09.17 WED · FASHION & BEAUTY</p><h2>트렌드는 매일 바뀌고,<br />소재는 더 빨리 피로해집니다.</h2><p>오늘의 쇼핑 신호를 바로 A/B 테스트용 기획으로 바꾸세요.</p><ActionButton variant="brandSolid" className="seed-action" onClick={() => onStart(selectedTrend)}><Sparkles size={17} />{selectedTrend ? `“${selectedTrend.title}”로 제작` : "소재 만들기"}<ChevronRight size={17} /></ActionButton></div><div className="hero-orb"><Flame size={58} /><span>+{selectedTrend?.growth || 0}%<small>최근 3일 변화</small></span></div></section>
+    <section className="signal-panel"><div className="section-heading"><div><p className="eyebrow">SHOPPING INSIGHT</p><h2>카테고리 신호</h2></div><span className="fresh"><span />{provider === "naver-shopping" ? "네이버 API 연결됨" : "데모 · API 키 대기"}</span></div><div className="signal-bars"><div><span>패션의류</span><i style={{ width: "88%" }} /><b>88</b></div><div><span>화장품/미용</span><i style={{ width: "64%" }} /><b>64</b></div><div><span>패션잡화</span><i style={{ width: "47%" }} /><b>47</b></div></div><p className="source-note">API 키를 설정하면 네이버 쇼핑 클릭 상대지수를 서버에서 불러옵니다. 조회 묶음끼리만 비교하세요.</p></section>
     <section className="trend-section"><div className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR BRAND</p><h2>떠오르는 키워드</h2></div><button className="text-button"><Search size={16} />전체 탐색</button></div><div className="trend-list">{trends.map((trend) => <article className={selectedTrend?.id === trend.id ? "trend-card selected" : "trend-card"} key={trend.id} onClick={() => onSelect(trend)}><div className="trend-color" style={{ background: trend.color }}><TrendingUp size={19} /></div><div className="trend-copy"><div><span className="pill">{trend.category}</span><strong>{trend.title}</strong></div><p>{trend.description}</p><svg viewBox="0 0 100 42" aria-label={`${trend.title} 추이`}><path d={sparkPath(trend.values)} /></svg></div><div className="trend-meta"><b>+{trend.growth}%</b><small>추천 {trend.score}</small><button aria-label={`${trend.title} 저장`} className={savedTrends.includes(trend.id) ? "save-button saved" : "save-button"} onClick={(event) => { event.stopPropagation(); onSave(trend); }}>{savedTrends.includes(trend.id) ? <Check size={16} /> : <Plus size={16} />}</button></div></article>)}</div></section>
   </div>;
 }
@@ -292,7 +257,7 @@ function Studio({ product, selectedTrend, creatives, fileRef, onProduct, onImage
             {product.image ? <img src={product.image} alt="등록한 상품" /> : <><ImagePlus size={22} /><span>제품 사진 추가</span><small>JPG, PNG, WebP · 최대 10MB</small></>}
           </button>
           <div className="trend-connection"><div><TrendingUp size={17} /><span>선택한 신호</span></div><strong>{selectedTrend?.title || "상품 중심 기획"}</strong><p>{selectedTrend ? `${selectedTrend.description} · 최근 3일 +${selectedTrend.growth}%` : "트렌드를 고르지 않아도 제작할 수 있어요."}</p></div>
-          <button className="primary-button wide" type="submit"><Sparkles size={17} />카피 비교 3종 만들기</button>
+          <ActionButton variant="brandSolid" className="seed-action wide" type="submit"><Sparkles size={17} />카피 비교 3종 만들기</ActionButton>
         </form>
       </section>
       <section className="creative-panel">
@@ -316,7 +281,7 @@ function CreativePreview({ creative, product }: { creative: Creative; product: P
 }
 
 function Editor({ creative, onClose, onUpdate, onExport }: { creative: Creative; onClose: () => void; onUpdate: (key: keyof Creative, value: string) => void; onExport: (creative: Creative) => void }) {
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="소재 편집"><div className="editor-modal"><header><div><p className="eyebrow">VARIANT {creative.id} · EDITOR</p><h2>텍스트 레이어 편집</h2></div><button onClick={onClose} aria-label="편집기 닫기"><X /></button></header><div className="editor-body"><CreativePreview creative={creative} product={initialProduct} /><div className="editor-controls"><label>헤드라인<textarea value={creative.headline} onChange={(e) => onUpdate("headline", e.target.value)} /></label><label>보조 문구<input value={creative.subline} onChange={(e) => onUpdate("subline", e.target.value)} /></label><label>CTA<input value={creative.cta} onChange={(e) => onUpdate("cta", e.target.value)} /></label><label>배경 색상<input type="color" value={creative.background} onChange={(e) => onUpdate("background", e.target.value)} /></label><div className={`policy-box ${creative.status === "차단" ? "blocked" : ""}`}>{creative.status === "통과" ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}<div><strong>{creative.status === "차단" ? "내보내기 차단" : "검토 가능"}</strong><p>{creative.finding || "편집 후 검토가 새로 적용됐어요."}</p></div></div><div className="editor-actions"><button className="outline-button" onClick={onClose}><Save size={16} />저장됨</button><button className="primary-button" onClick={() => onExport(creative)}><ArrowDownToLine size={16} />내보내기</button></div></div></div></div></div>;
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="소재 편집"><div className="editor-modal"><header><div><p className="eyebrow">VARIANT {creative.id} · EDITOR</p><h2>텍스트 레이어 편집</h2></div><button onClick={onClose} aria-label="편집기 닫기"><X /></button></header><div className="editor-body"><CreativePreview creative={creative} product={initialProduct} /><div className="editor-controls"><label>헤드라인<textarea value={creative.headline} onChange={(e) => onUpdate("headline", e.target.value)} /></label><label>보조 문구<input value={creative.subline} onChange={(e) => onUpdate("subline", e.target.value)} /></label><label>CTA<input value={creative.cta} onChange={(e) => onUpdate("cta", e.target.value)} /></label><label>배경 색상<input type="color" value={creative.background} onChange={(e) => onUpdate("background", e.target.value)} /></label><div className={`policy-box ${creative.status === "차단" ? "blocked" : ""}`}>{creative.status === "통과" ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}<div><strong>{creative.status === "차단" ? "내보내기 차단" : "검토 가능"}</strong><p>{creative.finding || "편집 후 검토가 새로 적용됐어요."}</p></div></div><div className="editor-actions"><button className="outline-button" onClick={onClose}><Save size={16} />저장됨</button><ActionButton variant="brandSolid" className="seed-action" onClick={() => onExport(creative)}><ArrowDownToLine size={16} />내보내기</ActionButton></div></div></div></div></div>;
 }
 
 function Performance({ metrics, performance, error, onCsv }: { metrics: Metric | null; performance: { ctr: number | null; cpc: number | null; cvr: number | null; roas: number | null } | null; error: string; onCsv: (event: ChangeEvent<HTMLInputElement>) => void }) {
