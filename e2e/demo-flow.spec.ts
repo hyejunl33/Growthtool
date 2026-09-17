@@ -23,7 +23,13 @@ test("reports integration status without exposing secret values", async ({ reque
   const response = await request.get("/api/health");
   expect(response.ok()).toBeTruthy();
   const body = await response.json();
-  expect(body).toMatchObject({ status: "ok", service: "growth-tool", mode: "credential-setup" });
+  expect(body).toMatchObject({
+    status: "ok",
+    service: "growth-tool",
+    mode: "credential-setup",
+    launchReady: false,
+    gates: { authenticatedWorkspace: false, liveTrend: false, productImageGeneration: false, liveAdPerformance: false },
+  });
   expect(body.integrations.adPerformance).toMatchObject({ meta: false, tiktok: false, googleAds: false, moloco: false });
   expect(JSON.stringify(body)).not.toContain("apiKey");
 });
