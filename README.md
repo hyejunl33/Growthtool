@@ -7,9 +7,18 @@
 - [개발 이슈](docs/BACKLOG.md): 우선순위, 의존성, 예상 공수, 이슈별 완료 조건
 - [조사 근거와 외부 의존성](docs/RESEARCH.md): 공식 출처, 확인된 사실, 검증이 필요한 조건
 
-작성 기준: 2026-09-17 / 1인 개발 / 6~8주. 현재 산출물은 기획·설계이며 애플리케이션과 외부 GitHub 이슈는 아직 생성하지 않았습니다.
+작성 기준: 2026-09-17 / 1인 개발 / 6~8주. 현재는 트렌드 대시보드, 소재 3종 생성·편집·SVG 내보내기, CSV 성과 계산을 포함한 로컬 MVP가 동작합니다.
 
-연결 저장소: [hyejunl33/Growthtool](https://github.com/hyejunl33/Growthtool). 로컬 `origin`과 `codex/prd-mvp-plan` 브랜치는 설정했습니다. 현재 GitHub 연결의 쓰기 권한 오류로 문서 업로드·원격 이슈 등록은 완료되지 않았습니다. 상세 상태는 [GitHub 연결 상태](docs/GITHUB_ISSUES.md)를 참고하세요.
+## 트렌드 API 연결
+
+`cp .env.example .env.local` 후 `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `NAVER_TREND_KEYWORDS_JSON`을 입력하면 `/api/trends`가 서버에서 네이버 쇼핑 인사이트를 조회합니다. 키가 비어 있으면 같은 응답 형식의 데모 피드를 제공하므로 화면을 바로 실행할 수 있습니다. API 키는 `NEXT_PUBLIC_` 접두어를 쓰지 않아 브라우저로 노출되지 않습니다.
+
+```bash
+pnpm install
+pnpm dev
+```
+
+연결 저장소: [hyejunl33/Growthtool](https://github.com/hyejunl33/Growthtool). 로컬 `origin`과 `codex/prd-mvp-plan` 브랜치는 설정했습니다. 원격 쓰기 인증은 아직 완료되지 않아, 이 브랜치의 새 커밋과 GitHub 이슈는 인증을 마친 뒤 푸시할 수 있습니다. 상세 상태는 [GitHub 연결 상태](docs/GITHUB_ISSUES.md)를 참고하세요.
 
 권장 개발 순서: PRD 범위 확인 → T01 기술 검증 → T02~T04 기반 → 제품 등록부터 다운로드까지 한 번 완주 → 트렌드·성과 비교 연결 → 비공개 PoC.
 
