@@ -17,6 +17,7 @@ import {
   Plus,
   Save,
   Search,
+  Settings,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -345,6 +346,7 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
           <button className={activeTab === "dashboard" ? "nav-item active" : "nav-item"} onClick={() => setActiveTab("dashboard")}><LayoutDashboard size={18} />오늘의 트렌드</button>
           <button className={activeTab === "studio" ? "nav-item active" : "nav-item"} onClick={() => setActiveTab("studio")}><Sparkles size={18} />크리에이티브 스튜디오</button>
           <button className={activeTab === "performance" ? "nav-item active" : "nav-item"} onClick={() => setActiveTab("performance")}><BarChart3 size={18} />성과 비교</button>
+          {persistenceEnabled && <a className="nav-item" href="/settings"><Settings size={18} />설정</a>}
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace"><span className="avatar">{(workspaceSummary?.brandName || "루미에르").slice(0, 1)}</span><div><strong>{workspaceSummary?.brandName || "루미에르"}</strong><small>{workspaceSummary?.category || "패션"} · PoC 워크스페이스</small></div></div>

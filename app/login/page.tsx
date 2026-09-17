@@ -5,6 +5,7 @@ import { ArrowRight, Mail, Sparkles } from "lucide-react";
 import { ActionButton } from "../../seed-design/ui/action-button";
 import { TextField, TextFieldInput } from "../../seed-design/ui/text-field";
 import { createClient } from "../../lib/supabase/client";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -45,6 +46,7 @@ export default function LoginPage() {
         </form>
         {status === "sent" && <p className="auth-success" role="status">{message}</p>}
         <small>로그인하면 비공개 베타의 데이터 처리 안내와 알려진 한계에 동의하게 됩니다.</small>
+        <footer className="legal-links"><Link href="/privacy">개인정보 처리 안내</Link><Link href="/terms">이용 조건</Link></footer>
       </section>
     </main>
   );
