@@ -25,6 +25,7 @@ import { calculatePerformance, parseMetricsCsv, type Metric } from "../lib/metri
 import { demoTrends, type Trend, type TrendFeed } from "../lib/trends";
 import { ActionButton } from "../seed-design/ui/action-button";
 import JSZip from "jszip";
+import NextImage from "next/image";
 
 type Product = {
   name: string;
@@ -285,7 +286,7 @@ function Studio({ product, selectedTrend, creatives, fileRef, onProduct, onImage
           <label>확인된 특징 <small>광고 카피에만 이 내용을 사용합니다</small><textarea value={product.facts} onChange={(event) => onProduct((current) => ({ ...current, facts: event.target.value }))} placeholder="소재, 색상, 핏 등 사실만 입력하세요" /></label>
           <input ref={fileRef} className="hidden-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={onImage} />
           <button type="button" className="upload-box" onClick={() => fileRef.current?.click()}>
-            {product.image ? <img src={product.image} alt="등록한 상품" /> : <><ImagePlus size={22} /><span>제품 사진 추가</span><small>JPG, PNG, WebP · 최대 10MB</small></>}
+            {product.image ? <NextImage src={product.image} alt="등록한 상품" width={600} height={400} unoptimized /> : <><ImagePlus size={22} /><span>제품 사진 추가</span><small>JPG, PNG, WebP · 최대 10MB</small></>}
           </button>
           <div className="trend-connection"><div><TrendingUp size={17} /><span>선택한 신호</span></div><strong>{selectedTrend?.title || "상품 중심 기획"}</strong><p>{selectedTrend ? `${selectedTrend.description} · 최근 3일 +${selectedTrend.growth}%` : "트렌드를 고르지 않아도 제작할 수 있어요."}</p></div>
           <ActionButton variant="brandSolid" className="seed-action wide" type="submit"><Sparkles size={17} />카피 비교 3종 만들기</ActionButton>
@@ -308,7 +309,7 @@ function Studio({ product, selectedTrend, creatives, fileRef, onProduct, onImage
 }
 
 function CreativePreview({ creative, product }: { creative: Creative; product: Product }) {
-  return <div className="creative-preview" style={{ background: creative.background, color: creative.accent }}><span className="variant-label">VARIANT {creative.id}</span><div className="preview-copy"><h3>{creative.headline.split("\n").map((line) => <span key={line}>{line}</span>)}</h3><p>{creative.subline}</p><b>{product.price ? `₩${product.price}` : ""}</b><button style={{ background: creative.accent }}>{creative.cta}</button></div><div className="product-visual" style={{ borderColor: creative.accent }}><div className="jacket"><i /><i /><span /></div>{product.image && <img src={product.image} alt="상품" />}</div><small>{product.name}</small></div>;
+  return <div className="creative-preview" style={{ background: creative.background, color: creative.accent }}><span className="variant-label">VARIANT {creative.id}</span><div className="preview-copy"><h3>{creative.headline.split("\n").map((line) => <span key={line}>{line}</span>)}</h3><p>{creative.subline}</p><b>{product.price ? `₩${product.price}` : ""}</b><button style={{ background: creative.accent }}>{creative.cta}</button></div><div className="product-visual" style={{ borderColor: creative.accent }}><div className="jacket"><i /><i /><span /></div>{product.image && <NextImage src={product.image} alt="상품" width={500} height={600} unoptimized />}</div><small>{product.name}</small></div>;
 }
 
 function Editor({ creative, product, onClose, onUpdate, onExport }: { creative: Creative; product: Product; onClose: () => void; onUpdate: (key: keyof Creative, value: string) => void; onExport: (creative: Creative) => void }) {
