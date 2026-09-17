@@ -18,6 +18,8 @@ GitHub 연결에서 이 저장소의 Contents 및 Issues 쓰기가 가능하도�
 
 연결에 Issues 쓰기 권한이 제공된 뒤 기존 이슈를 먼저 검색하고, `[P0][Txx]` ID를 기준으로 중복 없이 등록한다. 등록 결과는 아래 표에 추가한다. 원격 이슈 번호를 문서 ID와 동일하다고 가정하지 않는다.
 
+`scripts/publish-github-issues.mjs`가 구조화된 `docs/issues.json`을 읽어 위 기준으로 처리한다. 기본 실행은 dry run이며, 셸에서만 설정한 `GITHUB_TOKEN`으로 `pnpm issues:publish -- --publish`를 실행할 때만 GitHub 이슈를 만든다. 토큰에는 해당 저장소의 Issues 읽기·쓰기 권한이 필요하다.
+
 | 문서 ID | GitHub 이슈 | 등록 상태 |
 |---|---|---|
 | T01~T24 | 미등록 | 연결의 Issues 쓰기 권한 확인 필요 |
