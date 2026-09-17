@@ -128,28 +128,27 @@ function parseMetrics(text: string): Metric | null {
   return total;
 }
 
+function readSavedState(): { product?: Product; creatives?: Creative[]; savedTrends?: string[] } {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem("growth-tool-state") || "{}") as { product?: Product; creatives?: Creative[]; savedTrends?: string[] };
+  } catch {
+    return {};
+  }
+}
+
 export default function GrowthTool() {
+  const [storedState] = useState(readSavedState);
   const [activeTab, setActiveTab] = useState<"dashboard" | "studio" | "performance">("dashboard");
-  const [savedTrends, setSavedTrends] = useState<string[]>(["t1"]);
+  const [savedTrends, setSavedTrends] = useState<string[]>(storedState.savedTrends || ["t1"]);
   const [selectedTrend, setSelectedTrend] = useState<Trend | undefined>(trends[0]);
-  const [product, setProduct] = useState<Product>(initialProduct);
-  const [creatives, setCreatives] = useState<Creative[]>(initialCreatives);
+  const [product, setProduct] = useState<Product>(storedState.product || initialProduct);
+  const [creatives, setCreatives] = useState<Creative[]>(storedState.creatives || initialCreatives);
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
   const [notice, setNotice] = useState("오늘의 트렌드 데이터를 확인했어요.");
   const [metrics, setMetrics] = useState<Metric | null>(null);
   const [csvError, setCsvError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("growth-tool-state");
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as { product?: Product; creatives?: Creative[]; savedTrends?: string[] };
-      if (parsed.product) setProduct(parsed.product);
-      if (parsed.creatives) setCreatives(parsed.creatives);
-      if (parsed.savedTrends) setSavedTrends(parsed.savedTrends);
-    } catch { /* ignore malformed local demo state */ }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("growth-tool-state", JSON.stringify({ product, creatives, savedTrends }));
