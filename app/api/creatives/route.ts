@@ -4,22 +4,24 @@ import { creativeRequestSchema, generateCreativeVariants } from "../../../lib/cr
 import { hasSupabaseConfig } from "../../../lib/supabase/config";
 import { createClient } from "../../../lib/supabase/server";
 import { getCurrentWorkspace } from "../../../lib/workspace";
+import { hasValidJudgeAccess } from "../../../lib/judge-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
   let persistence: { supabase: Awaited<ReturnType<typeof createClient>>; workspaceId: string; jobId: string } | undefined;
+  const judgeAccess = hasValidJudgeAccess(request);
   const parsed = creativeRequestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "INVALID_CREATIVE_INPUT", fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  if (process.env.OPENAI_API_KEY && !hasSupabaseConfig() && process.env.NODE_ENV === "production") {
+  if (process.env.OPENAI_API_KEY && !hasSupabaseConfig() && process.env.NODE_ENV === "production" && !judgeAccess) {
     return NextResponse.json({ error: "AUTH_REQUIRED_FOR_AI" }, { status: 503 });
   }
 
-  if (hasSupabaseConfig()) {
+  if (hasSupabaseConfig() && !judgeAccess) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
     if (!data.user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });

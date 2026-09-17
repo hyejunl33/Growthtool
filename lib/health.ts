@@ -1,7 +1,9 @@
 import { hasSupabaseConfig } from "./supabase/config";
+import { hasJudgeAccessConfigured } from "./judge-access";
 
 export function getIntegrationHealth() {
   const auth = hasSupabaseConfig();
+  const judgeAccess = hasJudgeAccessConfigured();
   const creativeAi = Boolean(process.env.OPENAI_API_KEY);
   const trends = {
     naver: Boolean(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET),
@@ -20,9 +22,9 @@ export function getIntegrationHealth() {
     moloco: Boolean(process.env.MOLOCO_API_KEY && process.env.MOLOCO_AD_ACCOUNT_ID),
   };
   const gates = {
-    authenticatedWorkspace: auth,
+    testerAccess: auth || judgeAccess,
     liveTrend: Object.values(trends).some(Boolean),
-    productImageGeneration: auth && creativeAi,
+    productImageGeneration: (auth || judgeAccess) && creativeAi,
     liveAdPerformance: auth && Object.values(adPerformance).some(Boolean),
   };
 
@@ -30,6 +32,7 @@ export function getIntegrationHealth() {
     mode: auth ? "private-beta" as const : "credential-setup" as const,
     integrations: {
       auth,
+      judgeAccess,
       creativeAi,
       creativeImageAi: creativeAi,
       backgroundRemoval: Boolean(process.env.PHOTOROOM_API_KEY),
@@ -37,6 +40,6 @@ export function getIntegrationHealth() {
       adPerformance,
     },
     gates,
-    launchReady: Object.values(gates).every(Boolean),
+    launchReady: gates.testerAccess && gates.liveTrend && gates.productImageGeneration,
   };
 }

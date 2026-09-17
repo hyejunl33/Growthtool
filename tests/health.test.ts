@@ -3,6 +3,7 @@ import { getIntegrationHealth } from "../lib/health";
 
 const keys = [
   "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "OPENAI_API_KEY",
+  "JUDGE_ACCESS_CODE",
   "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "X_BEARER_TOKEN", "TIKTOK_TRENDS_API_URL",
   "META_ACCESS_TOKEN", "META_AD_ACCOUNT_ID", "TIKTOK_ADS_ACCESS_TOKEN", "TIKTOK_ADVERTISER_ID",
   "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_REFRESH_TOKEN", "GOOGLE_ADS_CUSTOMER_ID",
@@ -21,7 +22,7 @@ describe("launch health", () => {
     expect(getIntegrationHealth()).toMatchObject({
       mode: "credential-setup",
       launchReady: false,
-      gates: { authenticatedWorkspace: false, liveTrend: false, productImageGeneration: false, liveAdPerformance: false },
+      gates: { testerAccess: false, liveTrend: false, productImageGeneration: false, liveAdPerformance: false },
     });
   });
 
@@ -37,7 +38,19 @@ describe("launch health", () => {
     expect(getIntegrationHealth()).toMatchObject({
       mode: "private-beta",
       launchReady: true,
-      gates: { authenticatedWorkspace: true, liveTrend: true, productImageGeneration: true, liveAdPerformance: true },
+      gates: { testerAccess: true, liveTrend: true, productImageGeneration: true, liveAdPerformance: true },
+    });
+  });
+
+  it("accepts a protected judge session as the MVP tester access path", () => {
+    clearIntegrations();
+    vi.stubEnv("JUDGE_ACCESS_CODE", "judge-code-1234");
+    vi.stubEnv("OPENAI_API_KEY", "openai");
+    vi.stubEnv("X_BEARER_TOKEN", "x-token");
+    expect(getIntegrationHealth()).toMatchObject({
+      launchReady: true,
+      integrations: { judgeAccess: true },
+      gates: { testerAccess: true, liveTrend: true, productImageGeneration: true, liveAdPerformance: false },
     });
   });
 

@@ -108,7 +108,7 @@ function readSavedState(): { product?: Product; savedTrends?: string[] } {
   }
 }
 
-export default function GrowthTool({ persistenceEnabled = false, workspaceSummary }: { persistenceEnabled?: boolean; workspaceSummary?: { brandName: string; category: string; quotaUsed: number } }) {
+export default function GrowthTool({ persistenceEnabled = false, judgeMode = false, workspaceSummary }: { persistenceEnabled?: boolean; judgeMode?: boolean; workspaceSummary?: { brandName: string; category: string; quotaUsed: number } }) {
   const [storedState] = useState(readSavedState);
   const [activeTab, setActiveTab] = useState<"dashboard" | "studio" | "performance">("dashboard");
   const [trends, setTrends] = useState<Trend[]>([]);
@@ -122,6 +122,7 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
   const [notice, setNotice] = useState("실데이터 연결 상태를 확인하고 있어요.");
   const [performanceFeed, setPerformanceFeed] = useState<PerformanceFeed | null>(null);
   const [performanceLoading, setPerformanceLoading] = useState(false);
+  const [judgeCode, setJudgeCode] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -173,6 +174,11 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
       setNotice("상품명, 확인된 특징, 실제 제품 사진이 모두 필요해요.");
       return;
     }
+    if (judgeMode && judgeCode.trim().length < 8) {
+      setNotice("심사 체험 코드를 입력해주세요.");
+      return;
+    }
+    const aiHeaders = judgeMode ? { "X-Judge-Access-Code": judgeCode.trim() } : undefined;
     let productVersionId: string | undefined;
     if (persistenceEnabled) {
       setNotice("제품 사진을 안전하게 확인하고 저장하고 있어요.");
@@ -210,7 +216,7 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
     try {
       const response = await fetch("/api/creatives", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...aiHeaders },
         body: JSON.stringify({
           product,
           productVersionId,
@@ -228,7 +234,7 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
       }
       const result = await response.json() as { data: { provider: "openai"; variants: CreativeVariant[] } };
       const imageForm = new FormData(); imageForm.append("image", productFile); imageForm.append("productName", product.name); imageForm.append("productFacts", product.facts); imageForm.append("trend", selectedTrend?.title || "");
-      const imageResponse = await fetch("/api/creative-image", { method: "POST", body: imageForm });
+      const imageResponse = await fetch("/api/creative-image", { method: "POST", headers: aiHeaders, body: imageForm });
       if (!imageResponse.ok) { const body = await imageResponse.json().catch(() => ({})) as { error?: string }; throw new Error(body.error || "CREATIVE_IMAGE_GENERATION_FAILED"); }
       const imageResult = await imageResponse.json() as { data: { image: string } };
       const productReview = reviewCopy(product.facts);
@@ -239,7 +245,11 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
         ? "검토에서 차단 표현을 발견했어요. 문구를 수정해야 내보낼 수 있어요."
         : "OpenAI가 실제 제품 사진을 편집하고 카피 3종을 만들었어요.");
     } catch (error) {
-      setNotice(error instanceof Error && error.message.includes("NOT_CONFIGURED") ? "OpenAI API 키가 연결되지 않았어요. 환경변수를 설정한 뒤 다시 시도하세요." : "AI 소재 생성에 실패했어요. API 권한·크레딧과 이미지 형식을 확인하세요.");
+      setNotice(error instanceof Error && error.message.includes("NOT_CONFIGURED")
+        ? "OpenAI API 키가 연결되지 않았어요. 환경변수를 설정한 뒤 다시 시도하세요."
+        : error instanceof Error && (error.message.includes("AUTH_REQUIRED") || error.message.includes("UNAUTHORIZED"))
+          ? "심사 체험 코드가 올바르지 않아요. 발급받은 코드를 확인해주세요."
+          : "AI 소재 생성에 실패했어요. API 권한·크레딧과 이미지 형식을 확인하세요.");
     }
   }
 
@@ -351,7 +361,7 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
         <div className="notice" role="status"><Sparkles size={16} />{notice}</div>
 
         {activeTab === "dashboard" && <Dashboard trends={trends} feed={trendFeed} savedTrends={savedTrends} selectedTrend={selectedTrend} onSave={saveTrend} onSelect={setSelectedTrend} onStart={startStudio} />}
-        {activeTab === "studio" && <Studio product={product} selectedTrend={selectedTrend} creatives={creatives} fileRef={fileRef} onProduct={setProduct} onImage={handleFile} onGenerate={generate} onEdit={setSelectedCreative} onExport={exportCreative} />}
+        {activeTab === "studio" && <Studio product={product} selectedTrend={selectedTrend} creatives={creatives} fileRef={fileRef} judgeMode={judgeMode} judgeCode={judgeCode} onJudgeCode={setJudgeCode} onProduct={setProduct} onImage={handleFile} onGenerate={generate} onEdit={setSelectedCreative} onExport={exportCreative} />}
         {activeTab === "performance" && <Performance feed={performanceFeed} loading={performanceLoading} onRefresh={refreshPerformance} />}
       </section>
 
@@ -368,12 +378,13 @@ function Dashboard({ trends, feed, savedTrends, selectedTrend, onSave, onSelect,
   </div>;
 }
 
-function Studio({ product, selectedTrend, creatives, fileRef, onProduct, onImage, onGenerate, onEdit, onExport }: { product: Product; selectedTrend?: Trend; creatives: Creative[]; fileRef: React.RefObject<HTMLInputElement | null>; onProduct: React.Dispatch<React.SetStateAction<Product>>; onImage: (event: ChangeEvent<HTMLInputElement>) => void; onGenerate: (event: FormEvent) => void; onEdit: (creative: Creative) => void; onExport: (creative: Creative) => void }) {
+function Studio({ product, selectedTrend, creatives, fileRef, judgeMode, judgeCode, onJudgeCode, onProduct, onImage, onGenerate, onEdit, onExport }: { product: Product; selectedTrend?: Trend; creatives: Creative[]; fileRef: React.RefObject<HTMLInputElement | null>; judgeMode: boolean; judgeCode: string; onJudgeCode: (value: string) => void; onProduct: React.Dispatch<React.SetStateAction<Product>>; onImage: (event: ChangeEvent<HTMLInputElement>) => void; onGenerate: (event: FormEvent) => void; onEdit: (creative: Creative) => void; onExport: (creative: Creative) => void }) {
   return (
     <div className="studio-grid">
       <section className="brief-panel">
         <div className="section-heading"><div><p className="eyebrow">1. PRODUCT FACTS</p><h2>상품 정보</h2></div><span className="draft">자동 저장</span></div>
         <form onSubmit={onGenerate}>
+          {judgeMode && <label>심사 체험 코드 <small>입력값은 서버나 브라우저 저장소에 보관하지 않습니다</small><input type="password" autoComplete="off" value={judgeCode} onChange={(event) => onJudgeCode(event.target.value)} placeholder="체험 코드 입력" /></label>}
           <label>상품명<input value={product.name} onChange={(event) => onProduct((current) => ({ ...current, name: event.target.value }))} placeholder="예: 수분 장벽 세럼" /></label>
           <label>뷰티 세부 카테고리<input value={product.category} onChange={(event) => onProduct((current) => ({ ...current, category: event.target.value }))} placeholder="예: 세럼·앰플" /></label>
           <label>확인된 가격 <small>선택</small><div className="price-field"><span>₩</span><input value={product.price} onChange={(event) => onProduct((current) => ({ ...current, price: event.target.value.replace(/[^0-9,]/g, "") }))} placeholder="129,000" /></div></label>
@@ -412,7 +423,7 @@ function Editor({ creative, product, onClose, onUpdate, onExport }: { creative: 
 
 function Performance({ feed, loading, onRefresh }: { feed: PerformanceFeed | null; loading: boolean; onRefresh: () => void }) {
   const rows = feed?.rows || []; const sameCurrency = new Set(rows.map((row) => row.currency)).size <= 1; const performance = sameCurrency ? summarizePerformance(rows) : null;
-  return <div className="performance-page"><section className="performance-hero"><div><p className="eyebrow">3. LIVE PLATFORM REPORTS</p><h2>광고 플랫폼의<br />실측 성과를 한곳에서.</h2><p>Meta·TikTok·Google Ads·Moloco의 읽기 API를 직접 조회합니다. CSV 업로드나 예시 수치는 사용하지 않습니다.</p></div><ActionButton variant="brandSolid" className="seed-action" onClick={onRefresh} disabled={loading}>{loading ? <Clock3 size={17} /> : <RefreshCw size={17} />}{loading ? "동기화 중" : "플랫폼 동기화"}</ActionButton></section><section className="metrics-detail"><div className="section-heading"><div><p className="eyebrow">CONNECTIONS</p><h2>광고 계정 연결</h2></div>{feed && <span className="status-dot"><span />{feed.range.since} — {feed.range.until}</span>}</div><div className="connection-grid">{(feed?.connections || [
+  return <div className="performance-page"><section className="performance-hero"><div><p className="eyebrow">3. PERFORMANCE · NEXT PHASE</p><h2>광고 성과 연동<br />설계 미리보기.</h2><p>심사용 MVP에서는 트렌드 기반 배너 제작을 먼저 검증합니다. Meta·TikTok·Google Ads·Moloco 읽기 연동은 다음 단계 범위입니다.</p></div><ActionButton variant="brandSolid" className="seed-action" onClick={onRefresh} disabled={loading}>{loading ? <Clock3 size={17} /> : <RefreshCw size={17} />}{loading ? "확인 중" : "연동 상태 보기"}</ActionButton></section><section className="metrics-detail"><div className="section-heading"><div><p className="eyebrow">CONNECTION MOCKUP</p><h2>광고 계정 연결 예정</h2></div>{feed && <span className="status-dot"><span />{feed.range.since} — {feed.range.until}</span>}</div><div className="connection-grid">{(feed?.connections || [
     { platform: "meta", label: "Meta Ads", configured: false, status: "unconfigured", message: "동기화를 눌러 연결 상태를 확인하세요.", docsUrl: "https://developers.facebook.com/docs/marketing-api/insights/" },
     { platform: "tiktok", label: "TikTok Ads", configured: false, status: "unconfigured", message: "동기화를 눌러 연결 상태를 확인하세요.", docsUrl: "https://business-api.tiktok.com/portal/docs" },
     { platform: "google-ads", label: "Google Ads", configured: false, status: "unconfigured", message: "동기화를 눌러 연결 상태를 확인하세요.", docsUrl: "https://developers.google.com/google-ads/api/docs/reporting/overview" },

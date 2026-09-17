@@ -28,7 +28,7 @@ test("reports integration status without exposing secret values", async ({ reque
     service: "growth-tool",
     mode: "credential-setup",
     launchReady: false,
-    gates: { authenticatedWorkspace: false, liveTrend: false, productImageGeneration: false, liveAdPerformance: false },
+    gates: { testerAccess: false, liveTrend: false, productImageGeneration: false, liveAdPerformance: false },
   });
   expect(body.integrations.adPerformance).toMatchObject({ meta: false, tiktok: false, googleAds: false, moloco: false });
   expect(JSON.stringify(body)).not.toContain("apiKey");
