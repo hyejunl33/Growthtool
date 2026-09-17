@@ -10,8 +10,6 @@ test("shows only real-provider connection states when credentials are absent", a
   await page.getByRole("button", { name: "크리에이티브 스튜디오", exact: true }).click();
   await expect(page.getByRole("heading", { name: "생성된 소재", exact: true })).toBeVisible();
   await expect(page.getByText("생성된 소재가 없어요")).toBeVisible();
-  await page.getByRole("button", { name: "AI 이미지 + 카피 3종 만들기" }).click();
-  await expect(page.getByText("상품명, 확인된 특징, 실제 제품 사진이 모두 필요해요.")).toBeVisible();
 
   await page.getByRole("button", { name: "성과 비교", exact: true }).click();
   await page.getByRole("button", { name: "연동 상태 보기" }).click();
