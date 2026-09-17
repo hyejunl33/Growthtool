@@ -23,16 +23,45 @@ function columnIndex(headers: string[], aliases: readonly string[]) {
   return headers.findIndex((header) => aliases.includes(header));
 }
 
+function parseCsvRows(text: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === '"') {
+      if (quoted && text[index + 1] === '"') { field += '"'; index += 1; }
+      else quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      row.push(field); field = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(field); field = "";
+      if (row.some((value) => value.trim() !== "")) rows.push(row);
+      row = [];
+    } else field += character;
+  }
+  if (quoted) return null;
+  row.push(field);
+  if (row.some((value) => value.trim() !== "")) rows.push(row);
+  return rows;
+}
+
 function numberValue(value: string | undefined) {
-  const parsed = Number((value || "").replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (value === undefined || value.trim() === "") return null;
+  const normalized = value.trim().replace(/[₩$€£,\s]/g, "");
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 export function parseMetricsCsv(text: string): Metric | null {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return null;
+  if (new TextEncoder().encode(text).byteLength > 5 * 1024 * 1024) return null;
+  const rows = parseCsvRows(text.trim());
+  if (!rows || rows.length < 2 || rows.length > 10_001) return null;
 
-  const headers = lines[0].split(",").map((item) => item.trim().toLowerCase());
+  const headers = rows[0].map((item) => item.replace(/^\uFEFF/, "").trim().toLowerCase());
   const impressionsIndex = columnIndex(headers, requiredAliases.impressions);
   const clicksIndex = columnIndex(headers, requiredAliases.clicks);
   const spendIndex = columnIndex(headers, requiredAliases.spend);
@@ -42,13 +71,24 @@ export function parseMetricsCsv(text: string): Metric | null {
   const revenueIndex = columnIndex(headers, ["purchase_value", "revenue", "구매금액"]);
   const total: Metric = { impressions: 0, clicks: 0, spend: 0 };
 
-  for (const line of lines.slice(1)) {
-    const row = line.split(",");
-    total.impressions += numberValue(row[impressionsIndex]);
-    total.clicks += numberValue(row[clicksIndex]);
-    total.spend += numberValue(row[spendIndex]);
-    if (purchasesIndex >= 0) total.purchases = (total.purchases || 0) + numberValue(row[purchasesIndex]);
-    if (revenueIndex >= 0) total.revenue = (total.revenue || 0) + numberValue(row[revenueIndex]);
+  for (const row of rows.slice(1)) {
+    const impressions = numberValue(row[impressionsIndex]);
+    const clicks = numberValue(row[clicksIndex]);
+    const spend = numberValue(row[spendIndex]);
+    if (impressions === null || clicks === null || spend === null) return null;
+    total.impressions += impressions;
+    total.clicks += clicks;
+    total.spend += spend;
+    if (purchasesIndex >= 0) {
+      const purchases = numberValue(row[purchasesIndex]);
+      if (purchases === null) return null;
+      total.purchases = (total.purchases || 0) + purchases;
+    }
+    if (revenueIndex >= 0) {
+      const revenue = numberValue(row[revenueIndex]);
+      if (revenue === null) return null;
+      total.revenue = (total.revenue || 0) + revenue;
+    }
   }
   return total;
 }

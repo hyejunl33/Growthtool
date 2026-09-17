@@ -247,7 +247,8 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
     }
     const escapeXml = (value: string) => value.replace(/[<>&'"]/g, (character) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[character] || character);
     const headline = creative.headline.split("\n").map((line, index) => `<tspan x="84" dy="${index ? 110 : 0}">${escapeXml(line)}</tspan>`).join("");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080"><rect width="1080" height="1080" fill="${creative.background}"/><circle cx="830" cy="520" r="285" fill="${creative.accent}" opacity=".12"/><text x="84" y="190" font-family="Arial, sans-serif" font-size="42" fill="${creative.accent}">GROWTH TOOL / ${creative.id}</text><text x="84" y="390" font-family="Arial, sans-serif" font-size="88" font-weight="700" fill="${creative.accent}">${headline}</text><text x="84" y="690" font-family="Arial, sans-serif" font-size="38" fill="${creative.accent}">${escapeXml(creative.subline)}</text><rect x="84" y="814" width="286" height="86" rx="43" fill="${creative.accent}"/><text x="126" y="870" font-family="Arial, sans-serif" font-size="31" fill="#ffffff">${escapeXml(creative.cta)}</text><text x="84" y="990" font-family="Arial, sans-serif" font-size="24" fill="${creative.accent}">${escapeXml(product.name)} · 확인된 정보 기반 초안</text></svg>`;
+    const productVisual = product.image ? `<defs><clipPath id="product-frame"><rect x="575" y="225" width="430" height="610" rx="54"/></clipPath></defs><image href="${escapeXml(product.image)}" x="575" y="225" width="430" height="610" preserveAspectRatio="xMidYMid meet" clip-path="url(#product-frame)"/>` : "";
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080"><rect width="1080" height="1080" fill="${creative.background}"/><circle cx="830" cy="520" r="285" fill="${creative.accent}" opacity=".12"/>${productVisual}<text x="84" y="190" font-family="Arial, sans-serif" font-size="42" fill="${creative.accent}">GROWTH TOOL / ${creative.id}</text><text x="84" y="390" font-family="Arial, sans-serif" font-size="88" font-weight="700" fill="${creative.accent}">${headline}</text><text x="84" y="690" font-family="Arial, sans-serif" font-size="38" fill="${creative.accent}">${escapeXml(creative.subline)}</text><rect x="84" y="814" width="286" height="86" rx="43" fill="${creative.accent}"/><text x="126" y="870" font-family="Arial, sans-serif" font-size="31" fill="#ffffff">${escapeXml(creative.cta)}</text><text x="84" y="990" font-family="Arial, sans-serif" font-size="24" fill="${creative.accent}">${escapeXml(product.name)} · 확인된 정보 기반 초안</text></svg>`;
     try {
       const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
       const image = new Image();
@@ -283,7 +284,7 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
     }
   }
 
-  function handleFile(event: ChangeEvent<HTMLInputElement>) {
+  async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 10 * 1024 * 1024) {
@@ -291,9 +292,26 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       setProductFile(file);
       setProduct((current) => ({ ...current, image: String(reader.result) }));
+      const form = new FormData();
+      form.append("image", file);
+      try {
+        const response = await fetch("/api/images/remove-background", { method: "POST", body: form });
+        if (response.status === 501) {
+          setNotice("제품 원본을 등록했어요. Photoroom 키를 설정하면 배경을 자동 제거합니다.");
+          return;
+        }
+        if (!response.ok) throw new Error("BACKGROUND_REMOVAL_FAILED");
+        const cutout = await response.blob();
+        const cutoutReader = new FileReader();
+        cutoutReader.onload = () => setProduct((current) => ({ ...current, image: String(cutoutReader.result) }));
+        cutoutReader.readAsDataURL(cutout);
+        setNotice("제품 배경을 제거했어요. 원본은 별도로 안전하게 저장됩니다.");
+      } catch {
+        setNotice("배경 제거에 실패해 원본 사진으로 계속 진행합니다.");
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -301,6 +319,10 @@ export default function GrowthTool({ persistenceEnabled = false, workspaceSummar
   function handleCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setCsvError("CSV는 5MB 이하 파일만 업로드할 수 있어요.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const result = parseMetricsCsv(String(reader.result || ""));
@@ -387,7 +409,7 @@ function Studio({ product, selectedTrend, creatives, fileRef, onProduct, onImage
 }
 
 function CreativePreview({ creative, product }: { creative: Creative; product: Product }) {
-  return <div className="creative-preview" style={{ background: creative.background, color: creative.accent }}><span className="variant-label">VARIANT {creative.id}</span><div className="preview-copy"><h3>{creative.headline.split("\n").map((line) => <span key={line}>{line}</span>)}</h3><p>{creative.subline}</p><b>{product.price ? `₩${product.price}` : ""}</b><button style={{ background: creative.accent }}>{creative.cta}</button></div><div className="product-visual" style={{ borderColor: creative.accent }}><div className="jacket"><i /><i /><span /></div>{product.image && <NextImage src={product.image} alt="상품" width={500} height={600} unoptimized />}</div><small>{product.name}</small></div>;
+  return <div className="creative-preview" style={{ background: creative.background, color: creative.accent }}><span className="variant-label">VARIANT {creative.id}</span><div className="preview-copy"><h3>{creative.headline.split("\n").map((line, index) => <span key={`${line}-${index}`}>{line}</span>)}</h3><p>{creative.subline}</p><b>{product.price ? `₩${product.price}` : ""}</b><button style={{ background: creative.accent }}>{creative.cta}</button></div><div className={product.image ? "product-visual has-image" : "product-visual"} style={{ borderColor: creative.accent }}><div className="jacket"><i /><i /><span /></div>{product.image && <NextImage src={product.image} alt="상품" width={500} height={600} unoptimized />}</div><small>{product.name}</small></div>;
 }
 
 function Editor({ creative, product, onClose, onUpdate, onExport }: { creative: Creative; product: Product; onClose: () => void; onUpdate: (key: keyof Creative, value: string) => void; onExport: (creative: Creative) => void }) {

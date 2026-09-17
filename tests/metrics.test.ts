@@ -10,6 +10,15 @@ describe("parseMetricsCsv", () => {
   it("requires the three base metrics", () => {
     expect(parseMetricsCsv("impressions,spend\n10,100")).toBeNull();
   });
+
+  it("supports quoted currency values without splitting thousands separators", () => {
+    expect(parseMetricsCsv('impressions,link_clicks,spend\n"12,000",156,"₩78,000"')).toEqual({ impressions: 12000, clicks: 156, spend: 78000 });
+  });
+
+  it("rejects invalid and negative numeric data", () => {
+    expect(parseMetricsCsv("impressions,link_clicks,spend\n100,oops,500")).toBeNull();
+    expect(parseMetricsCsv("impressions,link_clicks,spend\n100,10,-500")).toBeNull();
+  });
 });
 
 describe("calculatePerformance", () => {
