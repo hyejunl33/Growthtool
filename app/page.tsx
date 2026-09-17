@@ -14,5 +14,5 @@ export default async function Home() {
     const { data: brand } = await supabase.from("brands").select("onboarding_completed_at").eq("workspace_id", workspaceId).single();
     if (!brand?.onboarding_completed_at) redirect("/onboarding");
   }
-  return <GrowthTool />;
+  return <GrowthTool persistenceEnabled={hasSupabaseConfig()} />;
 }

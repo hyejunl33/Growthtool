@@ -26,6 +26,7 @@ import { demoTrends, type Trend, type TrendFeed } from "../lib/trends";
 import { ActionButton } from "../seed-design/ui/action-button";
 import JSZip from "jszip";
 import NextImage from "next/image";
+import { createClient as createSupabaseClient } from "../lib/supabase/client";
 
 type Product = {
   name: string;
@@ -93,7 +94,7 @@ function readSavedState(): { product?: Product; creatives?: Creative[]; savedTre
   }
 }
 
-export default function GrowthTool() {
+export default function GrowthTool({ persistenceEnabled = false }: { persistenceEnabled?: boolean }) {
   const [storedState] = useState(readSavedState);
   const [activeTab, setActiveTab] = useState<"dashboard" | "studio" | "performance">("dashboard");
   const [trends, setTrends] = useState<Trend[]>(demoTrends);
@@ -102,6 +103,7 @@ export default function GrowthTool() {
   const [savedTrends, setSavedTrends] = useState<string[]>(storedState.savedTrends || ["t1"]);
   const [selectedTrend, setSelectedTrend] = useState<Trend | undefined>(demoTrends[0]);
   const [product, setProduct] = useState<Product>(storedState.product || initialProduct);
+  const [productFile, setProductFile] = useState<File | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>(storedState.creatives || initialCreatives);
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
   const [notice, setNotice] = useState("오늘의 트렌드 데이터를 확인했어요.");
@@ -143,11 +145,45 @@ export default function GrowthTool() {
     setNotice(trend ? `“${trend.title}” 신호를 기획에 연결했어요.` : "상품 중심 기획으로 시작했어요.");
   }
 
-  function generate(event: FormEvent) {
+  async function generate(event: FormEvent) {
     event.preventDefault();
     if (!product.name.trim() || !product.facts.trim()) {
       setNotice("상품명과 확인된 특징을 입력해야 카피를 만들 수 있어요.");
       return;
+    }
+    if (persistenceEnabled) {
+      if (!productFile) {
+        setNotice("외부 테스트에서는 제품 사진을 등록해야 소재를 만들 수 있어요.");
+        return;
+      }
+      setNotice("제품 사진을 안전하게 확인하고 저장하고 있어요.");
+      try {
+        const ticketResponse = await fetch("/api/products/upload-ticket", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mime: productFile.type, bytes: productFile.size }),
+        });
+        if (!ticketResponse.ok) throw new Error("UPLOAD_TICKET_FAILED");
+        const ticket = (await ticketResponse.json()) as { data: { path: string; token: string } };
+        const supabase = createSupabaseClient();
+        const { error: uploadError } = await supabase.storage.from("private-assets").uploadToSignedUrl(ticket.data.path, ticket.data.token, productFile, { contentType: productFile.type });
+        if (uploadError) throw uploadError;
+        const productResponse = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: product.name,
+            category: product.category,
+            price: product.price ? Number(product.price.replace(/,/g, "")) : null,
+            facts: product.facts.split(",").map((value) => value.trim()).filter(Boolean),
+            uploads: [{ path: ticket.data.path, mime: productFile.type, bytes: productFile.size }],
+          }),
+        });
+        if (!productResponse.ok) throw new Error("PRODUCT_SAVE_FAILED");
+      } catch {
+        setNotice("제품 사진을 저장하지 못했어요. 형식·크기와 Storage 설정을 확인해주세요.");
+        return;
+      }
     }
     const blocked = /(완치|최고|1위|무조건|보장)/.test(product.facts);
     const next = makeCreatives(product, selectedTrend).map((creative) => blocked ? { ...creative, status: "차단" as const, finding: "확인되지 않은 절대·보장 표현을 제거하세요." } : creative);
@@ -216,7 +252,10 @@ export default function GrowthTool() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setProduct((current) => ({ ...current, image: String(reader.result) }));
+    reader.onload = () => {
+      setProductFile(file);
+      setProduct((current) => ({ ...current, image: String(reader.result) }));
+    };
     reader.readAsDataURL(file);
   }
 
