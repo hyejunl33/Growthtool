@@ -49,13 +49,13 @@ describe("gpt-image-2 creative image route", () => {
     expect(mocks.toFile).toHaveBeenCalledWith(expect.any(Buffer), "product.png", { type: "image/png" });
     expect(mocks.edit).toHaveBeenCalledWith(expect.objectContaining({
       model: "gpt-image-2",
-      input_fidelity: "high",
       quality: "medium",
       size: "1024x1024",
       output_format: "png",
       n: 1,
       prompt: expect.stringMatching(/수분 장벽 세럼[\s\S]*장벽 케어/),
     }));
+    expect(mocks.edit.mock.calls[0]?.[0]).not.toHaveProperty("input_fidelity");
   });
 
   it("rejects a file that only claims to be an image before calling OpenAI", async () => {

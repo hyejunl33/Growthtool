@@ -54,7 +54,6 @@ export async function POST(request: Request) {
         `Verified facts: ${productFacts}`,
         trend ? `Current planning signal: ${trend}. Treat this only as visual inspiration, never as a product fact.` : "",
       ].filter(Boolean).join("\n"),
-      input_fidelity: "high",
       quality: "medium",
       size: "1024x1024",
       output_format: "png",
