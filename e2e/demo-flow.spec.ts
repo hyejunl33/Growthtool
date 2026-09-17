@@ -13,7 +13,7 @@ test("shows only real-provider connection states when credentials are absent", a
   await expect(page.getByText("상품명, 확인된 특징, 실제 제품 사진이 모두 필요해요.")).toBeVisible();
 
   await page.getByRole("button", { name: "성과 비교", exact: true }).click();
-  await page.getByRole("button", { name: "플랫폼 동기화" }).click();
+  await page.getByRole("button", { name: "연동 상태 보기" }).click();
   await expect(page.getByText("Meta Ads")).toBeVisible();
   await expect(page.getByRole("link", { name: /Moloco 연결 필요/ })).toBeVisible();
   await expect(page.getByText("동기화된 실측 성과가 없어요")).toBeVisible();
