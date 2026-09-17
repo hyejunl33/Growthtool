@@ -42,6 +42,28 @@ function ymd(value: Date) { return value.toISOString().slice(0, 10); }
 export function defaultDateRange(days = 14) { const until = new Date(); const since = new Date(until); since.setUTCDate(until.getUTCDate() - days + 1); return { since: ymd(since), until: ymd(until) }; }
 function actionValue(actions: unknown, names: string[]) { if (!Array.isArray(actions)) return undefined; const item = actions.find((entry) => entry && typeof entry === "object" && names.includes(String((entry as { action_type?: unknown }).action_type))); return item ? number((item as { value?: unknown }).value) : undefined; }
 
+function rowIdentity(row: AdMetricRow) {
+  return [row.platform, row.accountId, row.date, row.campaignId || "", row.adId || "", row.currency].join("");
+}
+
+export function normalizePerformanceRows(rows: AdMetricRow[], range: { since: string; until: string }) {
+  const unique = new Map<string, AdMetricRow>();
+  for (const row of rows) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || row.date < range.since || row.date > range.until) continue;
+    const normalized = {
+      ...row,
+      currency: row.currency.trim().toUpperCase() || "UNKNOWN",
+      impressions: Math.max(0, number(row.impressions)),
+      clicks: Math.max(0, number(row.clicks)),
+      spend: Math.max(0, number(row.spend)),
+      purchases: row.purchases === undefined ? undefined : Math.max(0, number(row.purchases)),
+      revenue: row.revenue === undefined ? undefined : Math.max(0, number(row.revenue)),
+    };
+    unique.set(rowIdentity(normalized), normalized);
+  }
+  return [...unique.values()].sort((left, right) => left.date.localeCompare(right.date) || rowIdentity(left).localeCompare(rowIdentity(right)));
+}
+
 async function meta(range: { since: string; until: string }) {
   const token = process.env.META_ACCESS_TOKEN; const rawAccount = process.env.META_AD_ACCOUNT_ID; const version = process.env.META_GRAPH_VERSION || "v25.0";
   if (!token || !rawAccount) return { rows: [], status: { platform: "meta", label: labels.meta, configured: false, status: "unconfigured", message: "Access Token과 광고 계정 ID가 필요해요.", docsUrl: docs.meta } satisfies AdConnectionStatus };
@@ -98,7 +120,7 @@ async function moloco(range: { since: string; until: string }) {
 export async function getPerformanceFeed(range = defaultDateRange()): Promise<PerformanceFeed> {
   const adapters = [["meta", meta], ["tiktok", tiktok], ["google-ads", googleAds], ["moloco", moloco]] as const;
   const results = await Promise.all(adapters.map(async ([platform, load]) => { try { return await load(range); } catch (error) { return { rows: [] as AdMetricRow[], status: { platform, label: labels[platform], configured: true, status: "error" as const, message: error instanceof Error ? error.message : "PROVIDER_ERROR", docsUrl: docs[platform] } }; } }));
-  return { range, rows: results.flatMap((result) => result.rows), connections: results.map((result) => result.status), refreshedAt: new Date().toISOString() };
+  return { range, rows: normalizePerformanceRows(results.flatMap((result) => result.rows), range), connections: results.map((result) => result.status), refreshedAt: new Date().toISOString() };
 }
 
 export function summarizePerformance(rows: AdMetricRow[]) {

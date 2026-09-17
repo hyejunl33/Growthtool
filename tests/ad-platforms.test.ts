@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defaultDateRange, getPerformanceFeed, summarizePerformance, type AdMetricRow } from "../lib/ad-platforms";
+import { defaultDateRange, getPerformanceFeed, normalizePerformanceRows, summarizePerformance, type AdMetricRow } from "../lib/ad-platforms";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -24,6 +24,26 @@ describe("ad platform normalization", () => {
     expect(range.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(range.until).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(range.since <= range.until).toBe(true);
+  });
+
+  it("deduplicates daily ad rows and excludes provider rows outside the requested period", () => {
+    const row: AdMetricRow = { platform: "meta", date: "2026-09-16", accountId: "1", campaignId: "c1", adId: "a1", currency: "krw", impressions: 100, clicks: 2, spend: 1000 };
+    expect(normalizePerformanceRows([
+      row,
+      { ...row },
+      { ...row, date: "2026-09-14", impressions: 999 },
+    ], { since: "2026-09-15", until: "2026-09-17" })).toEqual([
+      expect.objectContaining({ date: "2026-09-16", currency: "KRW", impressions: 100 }),
+    ]);
+  });
+
+  it("keeps currencies separate and normalizes missing or invalid metric values safely", () => {
+    const rows = normalizePerformanceRows([
+      { platform: "meta", date: "2026-09-16", accountId: "1", adId: "krw", currency: " krw ", impressions: Number.NaN, clicks: -1, spend: -10 },
+      { platform: "google-ads", date: "2026-09-16", accountId: "2", adId: "usd", currency: "usd", impressions: 10, clicks: 1, spend: 2 },
+    ], { since: "2026-09-16", until: "2026-09-16" });
+    expect(rows.map((row) => row.currency)).toEqual(["USD", "KRW"]);
+    expect(rows.find((row) => row.adId === "krw")).toMatchObject({ impressions: 0, clicks: 0, spend: 0, purchases: undefined, revenue: undefined });
   });
 
   it("normalizes Meta purchase actions without exposing its token", async () => {
