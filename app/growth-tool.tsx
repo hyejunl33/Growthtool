@@ -59,9 +59,9 @@ const initialProduct: Product = {
 };
 
 const initialCreatives: Creative[] = [
-  { id: "A", headline: "매일 손이 가는\n소프트 재킷", subline: "가볍게 걸치고, 단정하게 완성해요", cta: "지금 만나보기", background: "#f2eee8", accent: "#3f352c", status: "통과" },
-  { id: "B", headline: "가을 출근룩의\n가장 쉬운 시작", subline: "출근부터 약속까지 자연스럽게", cta: "스타일 보기", background: "#e9e2d8", accent: "#5b4434", status: "통과" },
-  { id: "C", headline: "한 벌로 정리되는\n간절기 레이어드", subline: "확인된 상품 특징만 사용한 카피", cta: "컬렉션 보기", background: "#e5e9e2", accent: "#304239", status: "확인 필요", finding: "‘가장 쉬운’ 같은 비교 표현은 브랜드 톤을 확인하세요." },
+  { id: "A", headline: "매일 손이 가는\n소프트 재킷", subline: "가벼운 세미 오버핏", cta: "자세히 보기", background: "#f2eee8", accent: "#3f352c", status: "통과" },
+  { id: "B", headline: "가을 출근룩의\n단정한 시작", subline: "가벼운 세미 오버핏", cta: "자세히 보기", background: "#f2eee8", accent: "#3f352c", status: "통과" },
+  { id: "C", headline: "한 벌로 정리되는\n간절기 레이어드", subline: "가벼운 세미 오버핏", cta: "자세히 보기", background: "#f2eee8", accent: "#3f352c", status: "통과" },
 ];
 
 function sparkPath(values: number[]) {
@@ -76,15 +76,19 @@ function sparkPath(values: number[]) {
 
 const creativeStyles: Record<Creative["id"], Pick<Creative, "background" | "accent">> = {
   A: { background: "#f3eee6", accent: "#2f2923" },
-  B: { background: "#e8e1d6", accent: "#563f2e" },
-  C: { background: "#e5ebe6", accent: "#33463d" },
+  B: { background: "#f3eee6", accent: "#2f2923" },
+  C: { background: "#f3eee6", accent: "#2f2923" },
 };
 
 function presentVariants(variants: CreativeVariant[]): Creative[] {
+  const fixedSubline = variants[0]?.subline || "확인된 상품 특징";
+  const fixedCta = variants[0]?.cta || "자세히 보기";
   return variants.map((variant) => {
-    const review = reviewCopy(`${variant.headline} ${variant.subline} ${variant.cta}`);
+    const review = reviewCopy(`${variant.headline} ${fixedSubline} ${fixedCta}`);
     return {
       ...variant,
+      subline: fixedSubline,
+      cta: fixedCta,
       ...creativeStyles[variant.id],
       status: review.status,
       finding: review.findings[0]?.message,

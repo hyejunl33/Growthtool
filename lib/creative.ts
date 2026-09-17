@@ -52,9 +52,9 @@ export function createFallbackVariants(input: CreativeRequest): CreativeVariant[
     : "선택한 트렌드 없이 확인된 상품 특징만 사용했습니다.";
 
   return [
-    { id: "A", headline: `${name}\n매일 더 가볍게`, subline: fact, cta: "지금 만나보기", trendReason: "상품명을 중심으로 한 기본 카피입니다." },
-    { id: "B", headline: `${trendName}에\n자연스럽게 어울리는`, subline: `${name} · ${fact}`, cta: "스타일 보기", trendReason },
-    { id: "C", headline: "오늘의 룩을\n단정하게 완성", subline: fact, cta: "컬렉션 보기", trendReason },
+    { id: "A", headline: `${name}\n매일 더 가볍게`, subline: fact, cta: "자세히 보기", trendReason: "상품명을 중심으로 한 기본 카피입니다." },
+    { id: "B", headline: `${trendName}에\n자연스럽게 어울리는`, subline: fact, cta: "자세히 보기", trendReason },
+    { id: "C", headline: "오늘의 룩을\n단정하게 완성", subline: fact, cta: "자세히 보기", trendReason },
   ];
 }
 
@@ -85,6 +85,7 @@ export async function generateCreativeVariants(input: CreativeRequest): Promise<
       "사용자가 확인한 상품 사실만 주장으로 사용한다. 효능, 순위, 보장, 할인, 희소성은 입력에 명시되지 않으면 만들지 않는다.",
       "트렌드는 관심 신호이자 기획 가설로만 사용하고 상품 사실처럼 단정하지 않는다.",
       "A는 상품 중심, B는 트렌드 연결, C는 사용 장면 중심으로 서로 다른 헤드라인을 만든다.",
+      "공정한 카피 비교를 위해 세 안의 supporting copy와 CTA는 완전히 같은 문자열로 작성한다.",
       "headline에는 자연스러운 위치에 줄바꿈 문자 하나를 넣을 수 있다. 모든 문구는 한국어로 간결하게 작성한다.",
       "trendReason에는 해당 안에서 트렌드를 사용한 이유 또는 사용하지 않은 이유를 쓴다.",
     ].join("\n"),

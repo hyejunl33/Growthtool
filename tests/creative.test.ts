@@ -11,6 +11,8 @@ describe("creative brief", () => {
     expect(variants.map((variant) => variant.id)).toEqual(["A", "B", "C"]);
     expect(variants).toHaveLength(3);
     expect(variants.every((variant) => variant.subline.includes("가벼운 세미 오버핏"))).toBe(true);
+    expect(new Set(variants.map((variant) => variant.cta)).size).toBe(1);
+    expect(new Set(variants.map((variant) => variant.subline)).size).toBe(1);
   });
 
   it("rejects an empty fact field", () => {

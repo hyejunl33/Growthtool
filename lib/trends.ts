@@ -74,7 +74,7 @@ export async function getTrendFeed(): Promise<TrendFeed> {
       configured: false,
       refreshedAt: new Date().toISOString(),
       freshness: "demo",
-      message: "NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, NAVER_TREND_KEYWORDS_JSON을 설정하면 네이버 쇼핑 인사이트를 불러옵니다.",
+      message: "지금은 예시 트렌드를 표시하고 있어요. 데이터 연동 후 실제 쇼핑 신호로 자동 전환됩니다.",
       trends: demoTrends,
     };
   }
