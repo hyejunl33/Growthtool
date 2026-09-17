@@ -63,7 +63,7 @@ type AdMetricRow = {
 
 ### Naver
 
-`POST https://openapi.naver.com/v1/datalab/shopping/category/keywords`를 호출한다. 기본 카테고리는 화장품/미용 `50000002`, 기간은 14일, 단위는 일이다. `ratio`는 절대 검색량이 아닌 요청 묶음 안의 상대 클릭 지수다.
+`POST https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`를 호출한다. NAVER API HUB의 `X-NCP-APIGW-API-KEY-ID`, `X-NCP-APIGW-API-KEY` 헤더를 사용한다. 기본 카테고리는 화장품/미용 `50000002`, 기간은 14일, 단위는 일이다. `ratio`는 절대 검색량이 아닌 요청 묶음 안의 상대 클릭 지수다.
 
 ### X
 

@@ -71,7 +71,7 @@ async function naverTrends(): Promise<{ trends: Trend[]; status: ProviderStatus 
   const clientId = process.env.NAVER_CLIENT_ID; const clientSecret = process.env.NAVER_CLIENT_SECRET; const keywords = configuredKeywords().slice(0, 5);
   const sourceUrl = "https://datalab.naver.com/shoppingInsight/sCategory.naver";
   if (!clientId || !clientSecret || keywords.length === 0) return { trends: [], status: { provider: "naver-shopping", label: "네이버 쇼핑", configured: false, status: "unconfigured", message: "Client ID·Secret과 뷰티 키워드가 필요해요.", sourceUrl } };
-  const response = await fetch("https://openapi.naver.com/v1/datalab/shopping/category/keywords", { method: "POST", headers: { "Content-Type": "application/json", "X-Naver-Client-Id": clientId, "X-Naver-Client-Secret": clientSecret }, body: JSON.stringify({ ...period(14), timeUnit: "date", category: process.env.NAVER_SHOPPING_CATEGORY || "50000002", keyword: keywords.map(({ name, param }) => ({ name, param })) }), cache: "no-store" });
+  const response = await fetch("https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords", { method: "POST", headers: { "Content-Type": "application/json", "X-NCP-APIGW-API-KEY-ID": clientId, "X-NCP-APIGW-API-KEY": clientSecret }, body: JSON.stringify({ ...period(14), timeUnit: "date", category: process.env.NAVER_SHOPPING_CATEGORY || "50000002", keyword: keywords.map(({ name, param }) => ({ name, param })) }), cache: "no-store" });
   if (!response.ok) throw new Error(`NAVER_${response.status}`);
   const payload = await response.json() as NaverResponse;
   const observedAt = (payload.results || []).flatMap((result) => result.data.map((item) => item.period)).sort().at(-1);

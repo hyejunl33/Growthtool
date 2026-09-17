@@ -6,7 +6,7 @@
 
 | ID | 공식 출처 | 확인한 내용 | 설계 반영 |
 |---|---|---|---|
-| R01 | [네이버 쇼핑인사이트 API](https://developers.naver.com/docs/serviceapi/datalab/shopping/shopping.md) | 키워드 입력을 받아 일/주/월별 클릭 상대값 반환. 키워드 쌍 최대 5개, param은 1개 | 후보 키워드 관리 필요, 실시간 전체 급상승 목록으로 설명하지 않음 |
+| R01 | [NAVER API HUB 쇼핑인사이트 API](https://api.ncloud-docs.com/docs/naver-api-hub-shopping-insight-keywords) | 키워드 입력을 받아 일/주/월별 클릭 상대값 반환. 키워드 쌍 최대 5개, param은 1개 | 후보 키워드 관리 필요, 실시간 전체 급상승 목록으로 설명하지 않음 |
 | R02 | [네이버 API별 호출 한도](https://developers.naver.com/products/intro/plan/plan.md) | 쇼핑인사이트 기본 일 1,000회 | 서비스 공용 쿼터·배치·캐시 |
 | R03 | [네이버 데이터랩 고객센터](https://help.naver.com/service/17528/contents/17069?lang=ko&osType=COMMONOS) | 웹 서비스는 분야 통계·인기 검색어·검색어 통계 제공 | 웹 화면 기능과 공개 API 기능을 구분 |
 | R04 | [Meta 광고 라이브러리 API](https://www.facebook.com/ads/library/api/) | 검색 결과에 노출된 공식 설명은 정치·사회 이슈 광고와 UK/EU 등 광고 범위·공개 필드를 명시. 일반 한국 경쟁사의 구매 ROAS 제공 근거는 없음 | 국내 경쟁사 자동 수집·‘고ROAS’ 표시를 P0에서 제외 |

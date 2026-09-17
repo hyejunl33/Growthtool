@@ -25,6 +25,15 @@ describe("classifyTrendFreshness", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [{ title: "수분 세럼", data: [{ period: "2026-09-14", ratio: 20 }, { period: "2026-09-15", ratio: 30 }, { period: "2026-09-16", ratio: 40 }] }] }), { status: 200 })));
 
     const feed = await getTrendFeed();
+    expect(fetch).toHaveBeenCalledWith(
+      "https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-NCP-APIGW-API-KEY-ID": "naver-id",
+          "X-NCP-APIGW-API-KEY": "naver-secret",
+        }),
+      }),
+    );
     expect(feed.trends).toEqual([expect.objectContaining({ provider: "naver-shopping", category: "뷰티", title: "수분 세럼", values: [20, 30, 40] })]);
     expect(JSON.stringify(feed)).not.toContain("naver-secret");
   });
