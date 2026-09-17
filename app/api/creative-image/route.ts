@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+const imageModel = "gpt-image-2" as const;
 
 export async function POST(request: Request) {
   if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: "OPENAI_IMAGE_NOT_CONFIGURED" }, { status: 503 });
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   try {
     const upload = await toFile(Buffer.from(await image.arrayBuffer()), image.name || "product.png", { type: image.type });
     const response = await client.images.edit({
-      model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2",
+      model: imageModel,
       image: upload,
       prompt: [
         "Create a polished square Korean beauty performance-ad key visual from the supplied product photo.",
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     });
     const base64 = response.data?.[0]?.b64_json;
     if (!base64) throw new Error("IMAGE_OUTPUT_EMPTY");
-    return NextResponse.json({ data: { provider: "openai", model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2", image: `data:image/png;base64,${base64}` } });
+    return NextResponse.json({ data: { provider: "openai", model: imageModel, image: `data:image/png;base64,${base64}` } });
   } catch (error) {
     console.error("creative image generation failed", error);
     return NextResponse.json({ error: "CREATIVE_IMAGE_GENERATION_FAILED" }, { status: 502 });
