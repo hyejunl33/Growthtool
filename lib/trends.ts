@@ -34,6 +34,11 @@ export type TrendFeed = {
 
 type NaverKeyword = { name: string; param: string[]; description?: string };
 type NaverResponse = { results?: Array<{ title: string; data: Array<{ period: string; ratio: number }> }> };
+type NaverRankingDay = {
+  returnCode?: number;
+  date?: string;
+  ranks?: Array<{ rank: number; keyword: string }>;
+};
 
 const colors = ["#FFE4D6", "#E7E1FF", "#F4E3C1", "#D9F2E6", "#FFE0EC"];
 const beautyTerms = ["뷰티", "화장", "스킨", "크림", "세럼", "앰플", "토너", "클렌", "선크림", "립", "쿠션", "파운데이션", "마스카라", "향수", "헤어", "네일", "피부", "메이크업"];
@@ -70,7 +75,43 @@ function percentageChange(values: number[]) {
 async function naverTrends(): Promise<{ trends: Trend[]; status: ProviderStatus }> {
   const clientId = process.env.NAVER_CLIENT_ID; const clientSecret = process.env.NAVER_CLIENT_SECRET; const keywords = configuredKeywords().slice(0, 5);
   const sourceUrl = "https://datalab.naver.com/shoppingInsight/sCategory.naver";
-  if (!clientId || !clientSecret || keywords.length === 0) return { trends: [], status: { provider: "naver-shopping", label: "네이버 쇼핑", configured: false, status: "unconfigured", message: "Client ID·Secret과 뷰티 키워드가 필요해요.", sourceUrl } };
+  if (!clientId || !clientSecret || keywords.length === 0) {
+    if (process.env.NAVER_PUBLIC_RANKING_ENABLED === "false") return { trends: [], status: { provider: "naver-shopping", label: "네이버 쇼핑", configured: false, status: "unconfigured", message: "공개 랭킹 수집이 꺼져 있고 API HUB 설정도 없어요.", sourceUrl } };
+    const response = await fetch("https://datalab.naver.com/shoppingInsight/getKeywordRank.naver?timeUnit=date&cid=50000002", {
+      method: "POST",
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        Referer: "https://datalab.naver.com/",
+        "User-Agent": "GrowthTool/1.0 (+https://growthtool.vercel.app)",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`NAVER_RANKING_${response.status}`);
+    const days = ((await response.json()) as NaverRankingDay[]).filter((day) => day.returnCode === 0 && day.date && day.ranks?.length);
+    const latest = days.at(-1);
+    if (!latest?.date || !latest.ranks?.length) throw new Error("NAVER_RANKING_EMPTY");
+    const observedAt = latest.date;
+    const trends = latest.ranks.slice(0, 10).map((item, index) => {
+      const values = days.map((day) => {
+        const rank = day.ranks?.find((candidate) => candidate.keyword === item.keyword)?.rank;
+        return rank ? Math.max(0, 11 - rank) : 0;
+      });
+      return {
+        id: `naver-ranking-${item.keyword}`,
+        title: item.keyword,
+        category: "뷰티",
+        provider: "naver-shopping",
+        sourceUrl,
+        growth: percentageChange(values),
+        score: Math.max(10, 110 - item.rank * 10),
+        description: `네이버 쇼핑 화장품/미용 ${observedAt.replaceAll("/", ".")} 인기 검색어 ${item.rank}위 · 최근 ${days.length}일 공개 순위`,
+        color: colors[index % colors.length],
+        values,
+      } satisfies Trend;
+    });
+    return { trends, status: { provider: "naver-shopping", label: "네이버 쇼핑 인기 검색어", configured: true, status: "live", message: `${observedAt.replaceAll("/", ".")} 기준 ${trends.length}개 실측`, sourceUrl, observedAt: observedAt.replaceAll("/", "-") } };
+  }
   const response = await fetch("https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords", { method: "POST", headers: { "Content-Type": "application/json", "X-NCP-APIGW-API-KEY-ID": clientId, "X-NCP-APIGW-API-KEY": clientSecret }, body: JSON.stringify({ ...period(14), timeUnit: "date", category: process.env.NAVER_SHOPPING_CATEGORY || "50000002", keyword: keywords.map(({ name, param }) => ({ name, param })) }), cache: "no-store" });
   if (!response.ok) throw new Error(`NAVER_${response.status}`);
   const payload = await response.json() as NaverResponse;

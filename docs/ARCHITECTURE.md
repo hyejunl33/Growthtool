@@ -63,7 +63,9 @@ type AdMetricRow = {
 
 ### Naver
 
-`POST https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`를 호출한다. NAVER API HUB의 `X-NCP-APIGW-API-KEY-ID`, `X-NCP-APIGW-API-KEY` 헤더를 사용한다. 기본 카테고리는 화장품/미용 `50000002`, 기간은 14일, 단위는 일이다. `ratio`는 절대 검색량이 아닌 요청 묶음 안의 상대 클릭 지수다.
+기본 어댑터는 네이버 데이터랩 웹 화면이 사용하는 공개 일별 랭킹 요청 `POST /shoppingInsight/getKeywordRank.naver?timeUnit=date&cid=50000002`에서 화장품/미용 인기 검색어를 가져온다. 응답의 실제 순위를 10점 단위 관심도와 일별 순위 시계열로 정규화하며, 출처와 관측일을 함께 표시한다. 이 웹 엔드포인트는 변경될 수 있으므로 실패 시 가짜 데이터를 대체하지 않고 오류 상태를 노출한다.
+
+`NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `NAVER_TREND_KEYWORDS_JSON`이 모두 있으면 API HUB 어댑터를 우선한다. `POST https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`와 `X-NCP-APIGW-API-KEY-ID`, `X-NCP-APIGW-API-KEY` 헤더를 사용한다. 기간은 14일이며 `ratio`는 절대 검색량이 아닌 요청 묶음 안의 상대 클릭 지수다.
 
 ### X
 

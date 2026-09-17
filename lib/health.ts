@@ -6,7 +6,7 @@ export function getIntegrationHealth() {
   const judgeAccess = hasJudgeAccessConfigured();
   const creativeAi = Boolean(process.env.OPENAI_API_KEY);
   const trends = {
-    naver: Boolean(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET),
+    naver: process.env.NAVER_PUBLIC_RANKING_ENABLED !== "false" || Boolean(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET),
     x: Boolean(process.env.X_BEARER_TOKEN),
     tiktok: Boolean(process.env.TIKTOK_TRENDS_API_URL),
   };

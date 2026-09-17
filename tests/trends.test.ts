@@ -38,7 +38,26 @@ describe("classifyTrendFreshness", () => {
     expect(JSON.stringify(feed)).not.toContain("naver-secret");
   });
 
+  it("loads the public Naver beauty ranking without credentials", async () => {
+    vi.stubEnv("NAVER_CLIENT_ID", "");
+    vi.stubEnv("NAVER_CLIENT_SECRET", "");
+    vi.stubEnv("NAVER_TREND_KEYWORDS_JSON", "");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([
+      { returnCode: 0, date: "2026/09/15", ranks: [{ rank: 3, keyword: "수분크림" }, { rank: 6, keyword: "마스크팩" }] },
+      { returnCode: 0, date: "2026/09/16", ranks: [{ rank: 1, keyword: "수분크림" }, { rank: 4, keyword: "마스크팩" }] },
+    ]), { status: 200 })));
+
+    const feed = await getTrendFeed();
+    expect(fetch).toHaveBeenCalledWith(
+      "https://datalab.naver.com/shoppingInsight/getKeywordRank.naver?timeUnit=date&cid=50000002",
+      expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "X-Requested-With": "XMLHttpRequest" }) }),
+    );
+    expect(feed.trends[0]).toMatchObject({ provider: "naver-shopping", title: "수분크림", score: 100, values: [8, 10] });
+    expect(feed.providers[0]).toMatchObject({ status: "live", observedAt: "2026-09-16" });
+  });
+
   it("keeps only beauty-related X trends", async () => {
+    vi.stubEnv("NAVER_PUBLIC_RANKING_ENABLED", "false");
     vi.stubEnv("X_BEARER_TOKEN", "x-secret");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ trend_name: "수분크림", tweet_count: 1200 }, { trend_name: "야구 경기", tweet_count: 900 }] }), { status: 200 })));
 
@@ -48,6 +67,7 @@ describe("classifyTrendFreshness", () => {
   });
 
   it("accepts the licensed TikTok JSON feed contract", async () => {
+    vi.stubEnv("NAVER_PUBLIC_RANKING_ENABLED", "false");
     vi.stubEnv("TIKTOK_TRENDS_API_URL", "https://provider.example/trends");
     vi.stubEnv("TIKTOK_TRENDS_API_TOKEN", "tiktok-trend-secret");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ keyword: "glass skin", score: 91, growth: 18, values: [30, 45, 61], description: "뷰티 해시태그 상승", observedAt: "2026-09-17T00:00:00Z" }] }), { status: 200 })));

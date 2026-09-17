@@ -37,7 +37,6 @@ import { reviewCopy } from "../lib/policy";
 type Product = {
   name: string;
   category: string;
-  price: string;
   facts: string;
   image?: string;
 };
@@ -55,10 +54,10 @@ type Creative = {
 };
 
 const initialProduct: Product = {
-  name: "",
-  category: "스킨케어",
-  price: "",
-  facts: "",
+  name: "그로우 수분 장벽 세럼",
+  category: "세럼·앰플",
+  facts: "30ml, 무향, 투명한 젤 제형",
+  image: "/demo-product.png",
 };
 
 const initialCreatives: Creative[] = [];
@@ -115,7 +114,7 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
   const [trendFeed, setTrendFeed] = useState<TrendFeed | null>(null);
   const [savedTrends, setSavedTrends] = useState<string[]>(storedState.savedTrends || []);
   const [selectedTrend, setSelectedTrend] = useState<Trend | undefined>();
-  const [product, setProduct] = useState<Product>(storedState.product || initialProduct);
+  const [product, setProduct] = useState<Product>({ ...initialProduct, ...storedState.product, image: storedState.product?.image || initialProduct.image });
   const [productFile, setProductFile] = useState<File | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>(initialCreatives);
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
@@ -170,7 +169,7 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
 
   async function generate(event: FormEvent) {
     event.preventDefault();
-    if (!product.name.trim() || !product.facts.trim() || !productFile) {
+    if (!product.name.trim() || !product.facts.trim() || (!productFile && !product.image)) {
       setNotice("상품명, 확인된 특징, 실제 제품 사진이 모두 필요해요.");
       return;
     }
@@ -179,6 +178,19 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
       return;
     }
     const aiHeaders = judgeMode ? { "X-Judge-Access-Code": judgeCode.trim() } : undefined;
+    let sourceFile = productFile;
+    if (!sourceFile && product.image) {
+      try {
+        const demoResponse = await fetch(product.image);
+        if (!demoResponse.ok) throw new Error("DEMO_IMAGE_FETCH_FAILED");
+        const demoBlob = await demoResponse.blob();
+        sourceFile = new File([demoBlob], "growth-tool-demo-product.png", { type: demoBlob.type || "image/png" });
+      } catch {
+        setNotice("기본 제품 이미지를 불러오지 못했어요. 직접 이미지를 등록해주세요.");
+        return;
+      }
+    }
+    if (!sourceFile) return;
     let productVersionId: string | undefined;
     if (persistenceEnabled) {
       setNotice("제품 사진을 안전하게 확인하고 저장하고 있어요.");
@@ -186,12 +198,12 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
         const ticketResponse = await fetch("/api/products/upload-ticket", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mime: productFile.type, bytes: productFile.size }),
+          body: JSON.stringify({ mime: sourceFile.type, bytes: sourceFile.size }),
         });
         if (!ticketResponse.ok) throw new Error("UPLOAD_TICKET_FAILED");
         const ticket = (await ticketResponse.json()) as { data: { path: string; token: string } };
         const supabase = createSupabaseClient();
-        const { error: uploadError } = await supabase.storage.from("private-assets").uploadToSignedUrl(ticket.data.path, ticket.data.token, productFile, { contentType: productFile.type });
+        const { error: uploadError } = await supabase.storage.from("private-assets").uploadToSignedUrl(ticket.data.path, ticket.data.token, sourceFile, { contentType: sourceFile.type });
         if (uploadError) throw uploadError;
         const productResponse = await fetch("/api/products", {
           method: "POST",
@@ -199,9 +211,9 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
           body: JSON.stringify({
             name: product.name,
             category: product.category,
-            price: product.price ? Number(product.price.replace(/,/g, "")) : null,
+            price: null,
             facts: product.facts.split(",").map((value) => value.trim()).filter(Boolean),
-            uploads: [{ path: ticket.data.path, mime: productFile.type, bytes: productFile.size }],
+            uploads: [{ path: ticket.data.path, mime: sourceFile.type, bytes: sourceFile.size }],
           }),
         });
         if (!productResponse.ok) throw new Error("PRODUCT_SAVE_FAILED");
@@ -233,7 +245,7 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
         throw new Error(body.error || "CREATIVE_GENERATION_FAILED");
       }
       const result = await response.json() as { data: { provider: "openai"; variants: CreativeVariant[] } };
-      const imageForm = new FormData(); imageForm.append("image", productFile); imageForm.append("productName", product.name); imageForm.append("productFacts", product.facts); imageForm.append("trend", selectedTrend?.title || "");
+      const imageForm = new FormData(); imageForm.append("image", sourceFile); imageForm.append("productName", product.name); imageForm.append("productFacts", product.facts); imageForm.append("trend", selectedTrend?.title || "");
       const imageResponse = await fetch("/api/creative-image", { method: "POST", headers: aiHeaders, body: imageForm });
       if (!imageResponse.ok) { const body = await imageResponse.json().catch(() => ({})) as { error?: string }; throw new Error(body.error || "CREATIVE_IMAGE_GENERATION_FAILED"); }
       const imageResult = await imageResponse.json() as { data: { image: string } };
@@ -293,7 +305,7 @@ export default function GrowthTool({ persistenceEnabled = false, judgeMode = fal
       zip.file(`growth-tool-${creative.id}-${exportId}.png`, png);
       zip.file("copy.txt", `${creative.headline}\n\n${creative.subline}\n${creative.cta}`);
       zip.file("experiment.md", `# ${creative.id}안\n\n비교 변수: 헤드라인\n트렌드: ${selectedTrend?.title || "상품 중심"}\n상품: ${product.name}\n`);
-      zip.file("scene.json", JSON.stringify({ canvas: { width: 1080, height: 1080, colorSpace: "sRGB" }, creative, product: { name: product.name, price: product.price }, exportId }, null, 2));
+      zip.file("scene.json", JSON.stringify({ canvas: { width: 1080, height: 1080, colorSpace: "sRGB" }, creative, product: { name: product.name }, exportId }, null, 2));
       zip.file("manifest.json", JSON.stringify({ exportId, createdAt: new Date().toISOString(), version: "mvp-1", assets: [`growth-tool-${creative.id}-${exportId}.png`, "copy.txt", "experiment.md", "scene.json"] }, null, 2));
       const archive = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(archive);
@@ -387,7 +399,6 @@ function Studio({ product, selectedTrend, creatives, fileRef, judgeMode, judgeCo
           {judgeMode && <label>심사 체험 코드 <small>입력값은 서버나 브라우저 저장소에 보관하지 않습니다</small><input type="password" autoComplete="off" value={judgeCode} onChange={(event) => onJudgeCode(event.target.value)} placeholder="체험 코드 입력" /></label>}
           <label>상품명<input value={product.name} onChange={(event) => onProduct((current) => ({ ...current, name: event.target.value }))} placeholder="예: 수분 장벽 세럼" /></label>
           <label>뷰티 세부 카테고리<input value={product.category} onChange={(event) => onProduct((current) => ({ ...current, category: event.target.value }))} placeholder="예: 세럼·앰플" /></label>
-          <label>확인된 가격 <small>선택</small><div className="price-field"><span>₩</span><input value={product.price} onChange={(event) => onProduct((current) => ({ ...current, price: event.target.value.replace(/[^0-9,]/g, "") }))} placeholder="129,000" /></div></label>
           <label>확인된 특징 <small>광고 카피에만 이 내용을 사용합니다</small><textarea value={product.facts} onChange={(event) => onProduct((current) => ({ ...current, facts: event.target.value }))} placeholder="전성분·용량·제형·인체적용시험 등 확인된 사실만 입력하세요" /></label>
           <input ref={fileRef} className="hidden-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={onImage} />
           <button type="button" className="upload-box" onClick={() => fileRef.current?.click()}>
@@ -414,7 +425,7 @@ function Studio({ product, selectedTrend, creatives, fileRef, judgeMode, judgeCo
 }
 
 function CreativePreview({ creative, product }: { creative: Creative; product: Product }) {
-  return <div className="creative-preview" style={{ background: creative.background, color: creative.accent }}>{creative.image && <NextImage className="generated-backdrop" src={creative.image} alt="AI가 제품 사진으로 생성한 광고 배경" fill sizes="420px" unoptimized />}<span className="variant-label">VARIANT {creative.id}</span><div className="preview-copy"><h3>{creative.headline.split("\n").map((line, index) => <span key={`${line}-${index}`}>{line}</span>)}</h3><p>{creative.subline}</p><b>{product.price ? `₩${product.price}` : ""}</b><button style={{ background: creative.accent }}>{creative.cta}</button></div>{!creative.image && <div className={product.image ? "product-visual has-image" : "product-visual"} style={{ borderColor: creative.accent }}>{product.image && <NextImage src={product.image} alt="상품" width={500} height={600} unoptimized />}</div>}<small>{product.name}</small></div>;
+  return <div className="creative-preview" style={{ background: creative.background, color: creative.accent }}>{creative.image && <NextImage className="generated-backdrop" src={creative.image} alt="AI가 제품 사진으로 생성한 광고 배경" fill sizes="420px" unoptimized />}<span className="variant-label">VARIANT {creative.id}</span><div className="preview-copy"><h3>{creative.headline.split("\n").map((line, index) => <span key={`${line}-${index}`}>{line}</span>)}</h3><p>{creative.subline}</p><button style={{ background: creative.accent }}>{creative.cta}</button></div>{!creative.image && <div className={product.image ? "product-visual has-image" : "product-visual"} style={{ borderColor: creative.accent }}>{product.image && <NextImage src={product.image} alt="상품" width={500} height={600} unoptimized />}</div>}<small>{product.name}</small></div>;
 }
 
 function Editor({ creative, product, onClose, onUpdate, onExport }: { creative: Creative; product: Product; onClose: () => void; onUpdate: (key: keyof Creative, value: string) => void; onExport: (creative: Creative) => void }) {

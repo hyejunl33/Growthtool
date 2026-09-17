@@ -4,7 +4,7 @@ import { getIntegrationHealth } from "../lib/health";
 const keys = [
   "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "OPENAI_API_KEY",
   "JUDGE_ACCESS_CODE",
-  "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "X_BEARER_TOKEN", "TIKTOK_TRENDS_API_URL",
+  "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "NAVER_PUBLIC_RANKING_ENABLED", "X_BEARER_TOKEN", "TIKTOK_TRENDS_API_URL",
   "META_ACCESS_TOKEN", "META_AD_ACCOUNT_ID", "TIKTOK_ADS_ACCESS_TOKEN", "TIKTOK_ADVERTISER_ID",
   "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_REFRESH_TOKEN", "GOOGLE_ADS_CUSTOMER_ID",
   "MOLOCO_API_KEY", "MOLOCO_AD_ACCOUNT_ID",
@@ -12,6 +12,7 @@ const keys = [
 
 function clearIntegrations() {
   for (const key of keys) vi.stubEnv(key, "");
+  vi.stubEnv("NAVER_PUBLIC_RANKING_ENABLED", "false");
 }
 
 afterEach(() => vi.unstubAllEnvs());
@@ -52,6 +53,13 @@ describe("launch health", () => {
       integrations: { judgeAccess: true },
       gates: { testerAccess: true, liveTrend: true, productImageGeneration: true, liveAdPerformance: false },
     });
+  });
+
+  it("recognizes the built-in public Naver beauty ranking", () => {
+    clearIntegrations();
+    vi.stubEnv("NAVER_PUBLIC_RANKING_ENABLED", "true");
+    expect(getIntegrationHealth().gates.liveTrend).toBe(true);
+    expect(getIntegrationHealth().integrations.trends.naver).toBe(true);
   });
 
   it("does not mark Google Ads configured without its client secret", () => {
