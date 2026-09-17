@@ -13,9 +13,20 @@ export type TrendFeed = {
   provider: "demo" | "naver-shopping";
   configured: boolean;
   refreshedAt: string;
+  observedAt?: string;
+  freshness: "demo" | "fresh" | "delayed" | "expired";
   message?: string;
   trends: Trend[];
 };
+
+export function classifyTrendFreshness(observedAt?: string, now = new Date()) {
+  if (!observedAt) return "demo" as const;
+  const observed = new Date(`${observedAt}T00:00:00+09:00`);
+  const age = Math.floor((now.getTime() - observed.getTime()) / 86_400_000);
+  if (Number.isNaN(observed.getTime()) || age > 7) return "expired" as const;
+  if (age >= 3) return "delayed" as const;
+  return "fresh" as const;
+}
 
 export const demoTrends: Trend[] = [
   { id: "t1", title: "가을 출근룩", category: "패션의류", growth: 43, score: 94, description: "간절기 레이어드와 출근 코디 탐색이 함께 늘고 있어요.", color: "#FFE4D6", values: [28, 31, 26, 36, 39, 53, 67] },
@@ -55,13 +66,14 @@ function percentageChange(values: number[]) {
 export async function getTrendFeed(): Promise<TrendFeed> {
   const clientId = process.env.NAVER_CLIENT_ID;
   const clientSecret = process.env.NAVER_CLIENT_SECRET;
-  const keywords = configuredKeywords();
+  const keywords = configuredKeywords().slice(0, 5);
 
   if (!clientId || !clientSecret || keywords.length === 0) {
     return {
       provider: "demo",
       configured: false,
       refreshedAt: new Date().toISOString(),
+      freshness: "demo",
       message: "NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, NAVER_TREND_KEYWORDS_JSON을 설정하면 네이버 쇼핑 인사이트를 불러옵니다.",
       trends: demoTrends,
     };
@@ -106,6 +118,8 @@ export async function getTrendFeed(): Promise<TrendFeed> {
     provider: "naver-shopping",
     configured: true,
     refreshedAt: new Date().toISOString(),
+    observedAt: (payload.results || []).flatMap((result) => result.data.map((item) => item.period)).sort().at(-1),
+    freshness: classifyTrendFreshness((payload.results || []).flatMap((result) => result.data.map((item) => item.period)).sort().at(-1)),
     trends: trends.length > 0 ? trends : demoTrends,
   };
 }

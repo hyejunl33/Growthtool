@@ -19,7 +19,7 @@
 | 이미지 전처리 | sharp | 크기 제한, 회전 보정, EXIF 제거, 해시·썸네일 |
 | 최종 렌더 | Playwright Chromium + 동일 react-konva 렌더러 | 브라우저 편집과 서버 PNG의 폰트·레이아웃 일치 |
 | 트렌드 | 네이버 공식 API, 운영자 CRUD | 제한된 소스로 데이터 신뢰성·출처 확보 |
-| 배포 | Vercel 웹, Supabase, Trigger.dev | 1인 운영 최소화. 이 문서는 배포 실행 요청이 아님 |
+| 배포 | Vercel 웹, Supabase, Trigger.dev | 1인 운영 최소화. 외부 테스터가 접근할 공개 HTTPS 운영 URL 제공 |
 | 관측 | Sentry + DB 구조화 usage/job/event 로그 | 오류·비용·퍼널을 먼저 계측. 외부 제품분석 도구는 이후 추가 |
 | 검증·CI | Vitest, Playwright, SQL/RLS 통합 검증, GitHub Actions | 수치·상태·권한·다운로드의 주요 실패 경로 검증 |
 

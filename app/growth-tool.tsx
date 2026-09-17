@@ -97,6 +97,7 @@ export default function GrowthTool() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "studio" | "performance">("dashboard");
   const [trends, setTrends] = useState<Trend[]>(demoTrends);
   const [trendProvider, setTrendProvider] = useState<TrendFeed["provider"]>("demo");
+  const [trendFreshness, setTrendFreshness] = useState<TrendFeed["freshness"]>("demo");
   const [savedTrends, setSavedTrends] = useState<string[]>(storedState.savedTrends || ["t1"]);
   const [selectedTrend, setSelectedTrend] = useState<Trend | undefined>(demoTrends[0]);
   const [product, setProduct] = useState<Product>(storedState.product || initialProduct);
@@ -119,6 +120,7 @@ export default function GrowthTool() {
         if (!live || feed.trends.length === 0) return;
         setTrends(feed.trends);
         setTrendProvider(feed.provider);
+        setTrendFreshness(feed.freshness);
         setSelectedTrend((current) => feed.trends.find((trend) => trend.id === current?.id) || feed.trends[0]);
         if (feed.message) setNotice(feed.message);
       })
@@ -253,7 +255,7 @@ export default function GrowthTool() {
         <header className="topbar"><div><p className="eyebrow">PERFORMANCE CREATIVE OS</p><h1>{activeTab === "dashboard" ? "오늘의 기회" : activeTab === "studio" ? "크리에이티브 스튜디오" : "내 광고 성과"}</h1></div><button className="outline-button" onClick={() => { localStorage.removeItem("growth-tool-state"); window.location.reload(); }}><Clock3 size={16} />데모 초기화</button></header>
         <div className="notice" role="status"><Sparkles size={16} />{notice}</div>
 
-        {activeTab === "dashboard" && <Dashboard trends={trends} provider={trendProvider} savedTrends={savedTrends} selectedTrend={selectedTrend} onSave={saveTrend} onSelect={setSelectedTrend} onStart={startStudio} />}
+        {activeTab === "dashboard" && <Dashboard trends={trends} provider={trendProvider} freshness={trendFreshness} savedTrends={savedTrends} selectedTrend={selectedTrend} onSave={saveTrend} onSelect={setSelectedTrend} onStart={startStudio} />}
         {activeTab === "studio" && <Studio product={product} selectedTrend={selectedTrend} creatives={creatives} fileRef={fileRef} onProduct={setProduct} onImage={handleFile} onGenerate={generate} onEdit={setSelectedCreative} onExport={exportCreative} />}
         {activeTab === "performance" && <Performance metrics={metrics} performance={performance} error={csvError} onCsv={handleCsv} />}
       </section>
@@ -263,10 +265,10 @@ export default function GrowthTool() {
   );
 }
 
-function Dashboard({ trends, provider, savedTrends, selectedTrend, onSave, onSelect, onStart }: { trends: Trend[]; provider: TrendFeed["provider"]; savedTrends: string[]; selectedTrend?: Trend; onSave: (trend: Trend) => void; onSelect: (trend: Trend) => void; onStart: (trend?: Trend) => void }) {
+function Dashboard({ trends, provider, freshness, savedTrends, selectedTrend, onSave, onSelect, onStart }: { trends: Trend[]; provider: TrendFeed["provider"]; freshness: TrendFeed["freshness"]; savedTrends: string[]; selectedTrend?: Trend; onSave: (trend: Trend) => void; onSelect: (trend: Trend) => void; onStart: (trend?: Trend) => void }) {
   return <div className="dashboard-grid">
     <section className="hero-card"><div><p className="eyebrow">09.17 WED · FASHION & BEAUTY</p><h2>트렌드는 매일 바뀌고,<br />소재는 더 빨리 피로해집니다.</h2><p>오늘의 쇼핑 신호를 바로 A/B 테스트용 기획으로 바꾸세요.</p><ActionButton variant="brandSolid" className="seed-action" onClick={() => onStart(selectedTrend)}><Sparkles size={17} />{selectedTrend ? `“${selectedTrend.title}”로 제작` : "소재 만들기"}<ChevronRight size={17} /></ActionButton></div><div className="hero-orb"><Flame size={58} /><span>+{selectedTrend?.growth || 0}%<small>최근 3일 변화</small></span></div></section>
-    <section className="signal-panel"><div className="section-heading"><div><p className="eyebrow">SHOPPING INSIGHT</p><h2>카테고리 신호</h2></div><span className="fresh"><span />{provider === "naver-shopping" ? "네이버 API 연결됨" : "데모 · API 키 대기"}</span></div><div className="signal-bars"><div><span>패션의류</span><i style={{ width: "88%" }} /><b>88</b></div><div><span>화장품/미용</span><i style={{ width: "64%" }} /><b>64</b></div><div><span>패션잡화</span><i style={{ width: "47%" }} /><b>47</b></div></div><p className="source-note">API 키를 설정하면 네이버 쇼핑 클릭 상대지수를 서버에서 불러옵니다. 조회 묶음끼리만 비교하세요.</p></section>
+    <section className="signal-panel"><div className="section-heading"><div><p className="eyebrow">SHOPPING INSIGHT</p><h2>카테고리 신호</h2></div><span className="fresh"><span />{provider === "naver-shopping" ? freshness === "fresh" ? "네이버 API · 최신" : freshness === "delayed" ? "업데이트 지연" : "데이터 만료" : "데모 · API 키 대기"}</span></div><div className="signal-bars"><div><span>패션의류</span><i style={{ width: "88%" }} /><b>88</b></div><div><span>화장품/미용</span><i style={{ width: "64%" }} /><b>64</b></div><div><span>패션잡화</span><i style={{ width: "47%" }} /><b>47</b></div></div><p className="source-note">API 키를 설정하면 네이버 쇼핑 클릭 상대지수를 서버에서 불러옵니다. 조회 묶음끼리만 비교하세요.</p></section>
     <section className="trend-section"><div className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR BRAND</p><h2>떠오르는 키워드</h2></div><button className="text-button"><Search size={16} />전체 탐색</button></div><div className="trend-list">{trends.map((trend) => <article className={selectedTrend?.id === trend.id ? "trend-card selected" : "trend-card"} key={trend.id} onClick={() => onSelect(trend)}><div className="trend-color" style={{ background: trend.color }}><TrendingUp size={19} /></div><div className="trend-copy"><div><span className="pill">{trend.category}</span><strong>{trend.title}</strong></div><p>{trend.description}</p><svg viewBox="0 0 100 42" aria-label={`${trend.title} 추이`}><path d={sparkPath(trend.values)} /></svg></div><div className="trend-meta"><b>+{trend.growth}%</b><small>추천 {trend.score}</small><button aria-label={`${trend.title} 저장`} className={savedTrends.includes(trend.id) ? "save-button saved" : "save-button"} onClick={(event) => { event.stopPropagation(); onSave(trend); }}>{savedTrends.includes(trend.id) ? <Check size={16} /> : <Plus size={16} />}</button></div></article>)}</div></section>
   </div>;
 }
