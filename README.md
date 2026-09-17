@@ -7,7 +7,7 @@
 - [개발 이슈](docs/BACKLOG.md): 우선순위, 의존성, 예상 공수, 이슈별 완료 조건
 - [조사 근거와 외부 의존성](docs/RESEARCH.md): 공식 출처, 확인된 사실, 검증이 필요한 조건
 
-작성 기준: 2026-09-17 / 1인 개발 / 6~8주. 현재는 트렌드 대시보드, 소재 3종 생성·편집·PNG/ZIP 내보내기, CSV 성과 계산을 포함한 로컬 알파가 동작합니다.
+작성 기준: 2026-09-17 / 1인 개발 / 6~8주. 공개 데모는 [growthtool.vercel.app](https://growthtool.vercel.app)에서 테스트할 수 있습니다. 배포 모드와 확인 범위는 [배포 기록](docs/DEPLOYMENT.md)을 참고하세요.
 
 ## 트렌드 API 연결
 
@@ -18,7 +18,7 @@ pnpm install
 pnpm dev
 ```
 
-연결 저장소: [hyejunl33/Growthtool](https://github.com/hyejunl33/Growthtool). 로컬 `origin`과 `codex/prd-mvp-plan` 브랜치는 설정했습니다. 원격 쓰기 인증은 아직 완료되지 않아, 이 브랜치의 새 커밋과 GitHub 이슈는 인증을 마친 뒤 푸시할 수 있습니다. 상세 상태는 [GitHub 연결 상태](docs/GITHUB_ISSUES.md)를 참고하세요.
+연결 저장소: [hyejunl33/Growthtool](https://github.com/hyejunl33/Growthtool). GitHub CLI는 시스템 키링으로 인증했으며 PR #25가 main에 반영되었습니다. PRD 백로그는 GitHub Issues #1–#24로 발행했습니다.
 
 권장 개발 순서: PRD 범위 확인 → T01 기술 검증 → T02~T04 기반 → 제품 등록부터 다운로드까지 한 번 완주 → 트렌드·성과 비교 연결 → 비공개 PoC.
 
