@@ -25,7 +25,7 @@
 
 Next.js 16은 공식 릴리스·지원 문서, React 캔버스는 Konva 문서를 기준으로 한다. [Next.js](https://nextjs.org/blog/next-16), [지원 정책](https://nextjs.org/support-policy), [React Konva](https://konvajs.org/docs/react/index.html)
 
-모델 기준 사양은 이미지 입력과 구조화 출력을 지원하는 GPT-4.1 mini 공식 문서에 근거한다. 품질 기준을 통과하지 못하면 모델만 교체할 수 있도록 어댑터로 감싼다. [모델 문서](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
+카피 기획은 Responses API의 구조화 출력과 `store: false`를 사용하며, 서버 환경변수 `OPENAI_TEXT_MODEL`로 모델을 교체할 수 있다. 현재 비용 중심 기본값은 `gpt-5.6-luna`다. 모델 변경 시 소형 평가셋과 비용 검증을 통과시킨다. [Responses API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [모델 문서](https://developers.openai.com/api/docs/models)
 
 ### 도입하지 않는 기술
 
@@ -80,7 +80,7 @@ docs/                       기획·설계·이슈·운영 문서
 
 개발·스테이징·운영은 DB·Storage·비밀키·스케줄을 분리한다. PR preview는 운영 작업을 실행하지 않는다. 실제 AI 호출은 테스트 태그·예산 아래 소수로 제한하고 CI는 fixture를 사용한다. 네이버 실데이터·실계정 연동 검증은 별도 수동 smoke 기록을 남긴다.
 
-환경변수 이름: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, PHOTOROOM_API_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, TRIGGER_SECRET_KEY, SENTRY_DSN. 공급자별 실제 키 형식은 구현 시 문서를 따른다. NEXT_PUBLIC 접두사에는 공개 가능한 값만 둔다.
+환경변수 이름: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, OPENAI_TEXT_MODEL, PHOTOROOM_API_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, TRIGGER_SECRET_KEY, SENTRY_DSN. 공급자별 실제 키 형식은 구현 시 문서를 따른다. NEXT_PUBLIC 접두사에는 공개 가능한 값만 둔다.
 
 모델·쿼터·가격표·재시도·타임아웃은 버전 있는 서버 설정으로 관리한다. 생성 모델의 이름을 바꾸면 소형 평가셋과 비용 검증을 먼저 통과해야 한다.
 

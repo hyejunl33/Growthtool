@@ -27,6 +27,7 @@ import { ActionButton } from "../seed-design/ui/action-button";
 import JSZip from "jszip";
 import NextImage from "next/image";
 import { createClient as createSupabaseClient } from "../lib/supabase/client";
+import type { CreativeVariant } from "../lib/creative";
 
 type Product = {
   name: string;
@@ -70,15 +71,19 @@ function sparkPath(values: number[]) {
   }).join(" ");
 }
 
-function makeCreatives(product: Product, trend?: Trend): Creative[] {
-  const name = product.name || "새 상품";
-  const trendName = trend?.title || "상품의 강점";
-  const fact = product.facts.split(",")[0]?.trim() || "확인된 특징";
-  return [
-    { id: "A", headline: `${name}\n매일 더 가볍게`, subline: fact, cta: "지금 만나보기", background: "#f3eee6", accent: "#2f2923", status: "통과" },
-    { id: "B", headline: `${trendName}에\n자연스럽게 어울리는`, subline: `${name} · ${fact}`, cta: "스타일 보기", background: "#e8e1d6", accent: "#563f2e", status: "통과" },
-    { id: "C", headline: `오늘의 룩을\n단정하게 완성`, subline: `${trendName} 탐색 신호를 반영한 카피`, cta: "컬렉션 보기", background: "#e5ebe6", accent: "#33463d", status: "확인 필요", finding: "트렌드 연결 근거를 확인한 뒤 내보내세요." },
-  ];
+const creativeStyles: Record<Creative["id"], Pick<Creative, "background" | "accent">> = {
+  A: { background: "#f3eee6", accent: "#2f2923" },
+  B: { background: "#e8e1d6", accent: "#563f2e" },
+  C: { background: "#e5ebe6", accent: "#33463d" },
+};
+
+function presentVariants(variants: CreativeVariant[], blocked: boolean): Creative[] {
+  return variants.map((variant) => ({
+    ...variant,
+    ...creativeStyles[variant.id],
+    status: blocked ? "차단" : variant.id === "C" ? "확인 필요" : "통과",
+    finding: blocked ? "확인되지 않은 절대·보장 표현을 제거하세요." : variant.id === "C" ? variant.trendReason : undefined,
+  }));
 }
 
 function metricValue(value?: number) {
@@ -185,10 +190,32 @@ export default function GrowthTool({ persistenceEnabled = false }: { persistence
         return;
       }
     }
-    const blocked = /(완치|최고|1위|무조건|보장)/.test(product.facts);
-    const next = makeCreatives(product, selectedTrend).map((creative) => blocked ? { ...creative, status: "차단" as const, finding: "확인되지 않은 절대·보장 표현을 제거하세요." } : creative);
-    setCreatives(next);
-    setNotice(blocked ? "검토에서 차단 표현을 발견했어요." : "카피 비교용 소재 3종을 만들었어요. 텍스트를 바로 수정할 수 있어요.");
+    setNotice("확인된 상품 정보로 카피 3종을 기획하고 있어요.");
+    try {
+      const response = await fetch("/api/creatives", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product,
+          trend: selectedTrend ? {
+            title: selectedTrend.title,
+            category: selectedTrend.category,
+            description: selectedTrend.description,
+          } : null,
+        }),
+      });
+      if (!response.ok) throw new Error("CREATIVE_GENERATION_FAILED");
+      const result = await response.json() as { data: { provider: "openai" | "demo"; variants: CreativeVariant[] } };
+      const blocked = /(완치|최고|1위|무조건|보장)/.test(product.facts + result.data.variants.map((variant) => `${variant.headline} ${variant.subline} ${variant.cta}`).join(" "));
+      setCreatives(presentVariants(result.data.variants, blocked));
+      setNotice(blocked
+        ? "검토에서 차단 표현을 발견했어요. 문구를 수정해야 내보낼 수 있어요."
+        : result.data.provider === "openai"
+          ? "AI가 확인된 사실을 바탕으로 카피 3종을 만들었어요."
+          : "데모 생성기로 카피 3종을 만들었어요. OpenAI 키를 설정하면 AI 기획을 사용합니다.");
+    } catch {
+      setNotice("카피 생성에 실패했어요. 잠시 뒤 다시 시도해주세요.");
+    }
   }
 
   function updateCreative(key: keyof Creative, value: string) {
