@@ -19,6 +19,8 @@ export const trendInputSchema = z.object({
 export const creativeRequestSchema = z.object({
   product: productInputSchema,
   trend: trendInputSchema,
+  productVersionId: z.string().uuid().optional(),
+  idempotencyKey: z.string().uuid().optional(),
 });
 
 export const creativeVariantSchema = z.object({

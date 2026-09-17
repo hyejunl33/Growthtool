@@ -12,6 +12,7 @@ import {
   Flame,
   ImagePlus,
   LayoutDashboard,
+  LogOut,
   Pencil,
   Plus,
   Save,
@@ -28,6 +29,7 @@ import JSZip from "jszip";
 import NextImage from "next/image";
 import { createClient as createSupabaseClient } from "../lib/supabase/client";
 import type { CreativeVariant } from "../lib/creative";
+import { reviewCopy } from "../lib/policy";
 
 type Product = {
   name: string;
@@ -77,13 +79,16 @@ const creativeStyles: Record<Creative["id"], Pick<Creative, "background" | "acce
   C: { background: "#e5ebe6", accent: "#33463d" },
 };
 
-function presentVariants(variants: CreativeVariant[], blocked: boolean): Creative[] {
-  return variants.map((variant) => ({
-    ...variant,
-    ...creativeStyles[variant.id],
-    status: blocked ? "차단" : variant.id === "C" ? "확인 필요" : "통과",
-    finding: blocked ? "확인되지 않은 절대·보장 표현을 제거하세요." : variant.id === "C" ? variant.trendReason : undefined,
-  }));
+function presentVariants(variants: CreativeVariant[]): Creative[] {
+  return variants.map((variant) => {
+    const review = reviewCopy(`${variant.headline} ${variant.subline} ${variant.cta}`);
+    return {
+      ...variant,
+      ...creativeStyles[variant.id],
+      status: review.status,
+      finding: review.findings[0]?.message,
+    };
+  });
 }
 
 function metricValue(value?: number) {
@@ -99,7 +104,7 @@ function readSavedState(): { product?: Product; creatives?: Creative[]; savedTre
   }
 }
 
-export default function GrowthTool({ persistenceEnabled = false }: { persistenceEnabled?: boolean }) {
+export default function GrowthTool({ persistenceEnabled = false, workspaceSummary }: { persistenceEnabled?: boolean; workspaceSummary?: { brandName: string; category: string; quotaUsed: number } }) {
   const [storedState] = useState(readSavedState);
   const [activeTab, setActiveTab] = useState<"dashboard" | "studio" | "performance">("dashboard");
   const [trends, setTrends] = useState<Trend[]>(demoTrends);
@@ -156,6 +161,7 @@ export default function GrowthTool({ persistenceEnabled = false }: { persistence
       setNotice("상품명과 확인된 특징을 입력해야 카피를 만들 수 있어요.");
       return;
     }
+    let productVersionId: string | undefined;
     if (persistenceEnabled) {
       if (!productFile) {
         setNotice("외부 테스트에서는 제품 사진을 등록해야 소재를 만들 수 있어요.");
@@ -185,6 +191,8 @@ export default function GrowthTool({ persistenceEnabled = false }: { persistence
           }),
         });
         if (!productResponse.ok) throw new Error("PRODUCT_SAVE_FAILED");
+        const storedProduct = await productResponse.json() as { data: { productVersionId: string } };
+        productVersionId = storedProduct.data.productVersionId;
       } catch {
         setNotice("제품 사진을 저장하지 못했어요. 형식·크기와 Storage 설정을 확인해주세요.");
         return;
@@ -197,6 +205,8 @@ export default function GrowthTool({ persistenceEnabled = false }: { persistence
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           product,
+          productVersionId,
+          idempotencyKey: persistenceEnabled ? crypto.randomUUID() : undefined,
           trend: selectedTrend ? {
             title: selectedTrend.title,
             category: selectedTrend.category,
@@ -206,8 +216,10 @@ export default function GrowthTool({ persistenceEnabled = false }: { persistence
       });
       if (!response.ok) throw new Error("CREATIVE_GENERATION_FAILED");
       const result = await response.json() as { data: { provider: "openai" | "demo"; variants: CreativeVariant[] } };
-      const blocked = /(완치|최고|1위|무조건|보장)/.test(product.facts + result.data.variants.map((variant) => `${variant.headline} ${variant.subline} ${variant.cta}`).join(" "));
-      setCreatives(presentVariants(result.data.variants, blocked));
+      const productReview = reviewCopy(product.facts);
+      const next = presentVariants(result.data.variants).map((creative) => productReview.status === "차단" ? { ...creative, status: "차단" as const, finding: productReview.findings[0]?.message } : creative);
+      const blocked = next.some((creative) => creative.status === "차단");
+      setCreatives(next);
       setNotice(blocked
         ? "검토에서 차단 표현을 발견했어요. 문구를 수정해야 내보낼 수 있어요."
         : result.data.provider === "openai"
@@ -221,9 +233,9 @@ export default function GrowthTool({ persistenceEnabled = false }: { persistence
   function updateCreative(key: keyof Creative, value: string) {
     if (!selectedCreative) return;
     const updated = { ...selectedCreative, [key]: value };
-    const blocked = /(완치|최고|1위|무조건|보장)/.test(updated.headline + updated.subline + updated.cta);
-    updated.status = blocked ? "차단" : "통과";
-    updated.finding = blocked ? "확인되지 않은 절대·보장 표현을 제거하세요." : undefined;
+    const review = reviewCopy(updated.headline + updated.subline + updated.cta);
+    updated.status = review.status;
+    updated.finding = review.findings[0]?.message;
     setSelectedCreative(updated);
     setCreatives((current) => current.map((creative) => creative.id === updated.id ? updated : creative));
   }
@@ -313,13 +325,13 @@ export default function GrowthTool({ persistenceEnabled = false }: { persistence
           <button className={activeTab === "performance" ? "nav-item active" : "nav-item"} onClick={() => setActiveTab("performance")}><BarChart3 size={18} />성과 비교</button>
         </nav>
         <div className="sidebar-bottom">
-          <div className="workspace"><span className="avatar">L</span><div><strong>루미에르</strong><small>패션 · PoC 워크스페이스</small></div></div>
-          <div className="quota"><span>이번 주 생성량</span><strong>2 <small>/ 5 세트</small></strong><div className="progress"><i /></div></div>
+          <div className="workspace"><span className="avatar">{(workspaceSummary?.brandName || "루미에르").slice(0, 1)}</span><div><strong>{workspaceSummary?.brandName || "루미에르"}</strong><small>{workspaceSummary?.category || "패션"} · PoC 워크스페이스</small></div></div>
+          <div className="quota"><span>이번 주 생성량</span><strong>{workspaceSummary?.quotaUsed ?? 2} <small>/ 5 세트</small></strong><div className="progress"><i style={{ width: `${Math.min(100, ((workspaceSummary?.quotaUsed ?? 2) / 5) * 100)}%` }} /></div></div>
         </div>
       </aside>
 
       <section className="content">
-        <header className="topbar"><div><p className="eyebrow">PERFORMANCE CREATIVE OS</p><h1>{activeTab === "dashboard" ? "오늘의 기회" : activeTab === "studio" ? "크리에이티브 스튜디오" : "내 광고 성과"}</h1></div><button className="outline-button" onClick={() => { localStorage.removeItem("growth-tool-state"); window.location.reload(); }}><Clock3 size={16} />데모 초기화</button></header>
+        <header className="topbar"><div><p className="eyebrow">PERFORMANCE CREATIVE OS</p><h1>{activeTab === "dashboard" ? "오늘의 기회" : activeTab === "studio" ? "크리에이티브 스튜디오" : "내 광고 성과"}</h1></div>{persistenceEnabled ? <form action="/auth/logout" method="post"><button className="outline-button" type="submit"><LogOut size={16} />로그아웃</button></form> : <button className="outline-button" onClick={() => { localStorage.removeItem("growth-tool-state"); window.location.reload(); }}><Clock3 size={16} />데모 초기화</button>}</header>
         <div className="notice" role="status"><Sparkles size={16} />{notice}</div>
 
         {activeTab === "dashboard" && <Dashboard trends={trends} provider={trendProvider} freshness={trendFreshness} savedTrends={savedTrends} selectedTrend={selectedTrend} onSave={saveTrend} onSelect={setSelectedTrend} onStart={startStudio} />}
