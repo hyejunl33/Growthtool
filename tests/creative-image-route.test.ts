@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   toFile: vi.fn(async () => ({ name: "product.png" })),
 }));
 
+const onePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
 vi.mock("openai", () => ({
   default: class OpenAI {
     images = { edit: mocks.edit };
@@ -18,7 +20,7 @@ beforeEach(() => {
   vi.stubEnv("JUDGE_ACCESS_CODE", "judge-code-1234");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
-  mocks.edit.mockReset().mockResolvedValue({ data: [{ b64_json: "cG5n" }] });
+  mocks.edit.mockReset().mockResolvedValue({ data: [{ b64_json: onePixelPng }] });
   mocks.toFile.mockClear();
 });
 
@@ -30,7 +32,7 @@ afterEach(() => {
 describe("gpt-image-2 creative image route", () => {
   it("edits the uploaded product at high fidelity with the selected trend", async () => {
     const form = new FormData();
-    form.append("image", new File([new Uint8Array([137, 80, 78, 71])], "serum.png", { type: "image/png" }));
+    form.append("image", new File([Buffer.from(onePixelPng, "base64")], "serum.png", { type: "image/png" }));
     form.append("productName", "수분 장벽 세럼");
     form.append("productFacts", "30ml, 무향, 투명한 젤 제형");
     form.append("trend", "장벽 케어");
@@ -42,7 +44,9 @@ describe("gpt-image-2 creative image route", () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ data: { provider: "openai", model: "gpt-image-2", image: "data:image/png;base64,cG5n" } });
+    const body = await response.json();
+    expect(body).toMatchObject({ data: { provider: "openai", model: "gpt-image-2", image: expect.stringMatching(/^data:image\/webp;base64,/) } });
+    expect(mocks.toFile).toHaveBeenCalledWith(expect.any(Buffer), "product.png", { type: "image/png" });
     expect(mocks.edit).toHaveBeenCalledWith(expect.objectContaining({
       model: "gpt-image-2",
       input_fidelity: "high",
@@ -52,6 +56,23 @@ describe("gpt-image-2 creative image route", () => {
       n: 1,
       prompt: expect.stringMatching(/수분 장벽 세럼[\s\S]*장벽 케어/),
     }));
+  });
+
+  it("rejects a file that only claims to be an image before calling OpenAI", async () => {
+    const form = new FormData();
+    form.append("image", new File(["not-an-image"], "fake.png", { type: "image/png" }));
+    form.append("productName", "수분 장벽 세럼");
+    form.append("productFacts", "30ml");
+    const { POST } = await import("../app/api/creative-image/route");
+    const response = await POST(new Request("https://growthtool.example/api/creative-image", {
+      method: "POST",
+      headers: { "X-Judge-Access-Code": "judge-code-1234" },
+      body: form,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "INVALID_IMAGE_CONTENT" });
+    expect(mocks.edit).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid judge code before calling OpenAI in production", async () => {

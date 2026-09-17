@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI, { toFile } from "openai";
+import sharp from "sharp";
 import { hasSupabaseConfig } from "../../../lib/supabase/config";
 import { createClient } from "../../../lib/supabase/server";
 import { hasValidJudgeAccess } from "../../../lib/judge-access";
@@ -24,8 +25,23 @@ export async function POST(request: Request) {
   const image = form.get("image"); const productName = String(form.get("productName") || "").trim(); const productFacts = String(form.get("productFacts") || "").trim(); const trend = String(form.get("trend") || "").trim();
   if (!(image instanceof File) || !allowedTypes.has(image.type) || image.size > 10 * 1024 * 1024 || !productName || !productFacts) return NextResponse.json({ error: "INVALID_IMAGE_INPUT" }, { status: 400 });
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  let normalizedInput: Buffer;
   try {
-    const upload = await toFile(Buffer.from(await image.arrayBuffer()), image.name || "product.png", { type: image.type });
+    const input = Buffer.from(await image.arrayBuffer());
+    const pipeline = sharp(input, { failOn: "error", limitInputPixels: 36_000_000 }).rotate();
+    const metadata = await pipeline.metadata();
+    if (!metadata.width || !metadata.height || metadata.width > 6000 || metadata.height > 6000) {
+      return NextResponse.json({ error: "IMAGE_DIMENSIONS_INVALID" }, { status: 400 });
+    }
+    normalizedInput = await pipeline
+      .resize({ width: 2048, height: 2048, fit: "inside", withoutEnlargement: true })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+  } catch {
+    return NextResponse.json({ error: "INVALID_IMAGE_CONTENT" }, { status: 400 });
+  }
+  try {
+    const upload = await toFile(normalizedInput, "product.png", { type: "image/png" });
     const response = await client.images.edit({
       model: imageModel,
       image: upload,
@@ -46,7 +62,12 @@ export async function POST(request: Request) {
     });
     const base64 = response.data?.[0]?.b64_json;
     if (!base64) throw new Error("IMAGE_OUTPUT_EMPTY");
-    return NextResponse.json({ data: { provider: "openai", model: imageModel, image: `data:image/png;base64,${base64}` } });
+    const optimizedOutput = await sharp(Buffer.from(base64, "base64"), { failOn: "error" })
+      .rotate()
+      .resize({ width: 1024, height: 1024, fit: "cover" })
+      .webp({ quality: 90, effort: 5 })
+      .toBuffer();
+    return NextResponse.json({ data: { provider: "openai", model: imageModel, image: `data:image/webp;base64,${optimizedOutput.toString("base64")}` } });
   } catch (error) {
     console.error("creative image generation failed", error);
     return NextResponse.json({ error: "CREATIVE_IMAGE_GENERATION_FAILED" }, { status: 502 });
