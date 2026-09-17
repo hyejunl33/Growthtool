@@ -24,6 +24,7 @@ import {
 import { calculatePerformance, parseMetricsCsv, type Metric } from "../lib/metrics";
 import { demoTrends, type Trend, type TrendFeed } from "../lib/trends";
 import { ActionButton } from "../seed-design/ui/action-button";
+import JSZip from "jszip";
 
 type Product = {
   name: string;
@@ -161,19 +162,47 @@ export default function GrowthTool() {
     setCreatives((current) => current.map((creative) => creative.id === updated.id ? updated : creative));
   }
 
-  function exportCreative(creative: Creative) {
+  async function exportCreative(creative: Creative) {
     if (creative.status === "차단") {
       setNotice("차단된 소재는 내보낼 수 없어요. 문구를 수정한 뒤 다시 검토하세요.");
       return;
     }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080"><rect width="1080" height="1080" fill="${creative.background}"/><circle cx="830" cy="520" r="285" fill="${creative.accent}" opacity=".12"/><text x="84" y="190" font-family="Arial, sans-serif" font-size="42" fill="${creative.accent}">GROWTH TOOL / ${creative.id}</text><text x="84" y="390" font-family="Arial, sans-serif" font-size="88" font-weight="700" fill="${creative.accent}">${creative.headline.split("\n").map((line, i) => `<tspan x="84" dy="${i ? 110 : 0}">${line}</tspan>`).join("")}</text><text x="84" y="690" font-family="Arial, sans-serif" font-size="38" fill="${creative.accent}">${creative.subline}</text><rect x="84" y="814" width="286" height="86" rx="43" fill="${creative.accent}"/><text x="126" y="870" font-family="Arial, sans-serif" font-size="31" fill="#ffffff">${creative.cta}</text><text x="84" y="990" font-family="Arial, sans-serif" font-size="24" fill="${creative.accent}">${product.name} · 확인된 정보 기반 초안</text></svg>`;
-    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `growth-tool-${creative.id}.svg`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setNotice(`${creative.id}안을 내보냈어요. 광고 집행 전 매체 가이드라인을 확인하세요.`);
+    const escapeXml = (value: string) => value.replace(/[<>&'"]/g, (character) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[character] || character);
+    const headline = creative.headline.split("\n").map((line, index) => `<tspan x="84" dy="${index ? 110 : 0}">${escapeXml(line)}</tspan>`).join("");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080"><rect width="1080" height="1080" fill="${creative.background}"/><circle cx="830" cy="520" r="285" fill="${creative.accent}" opacity=".12"/><text x="84" y="190" font-family="Arial, sans-serif" font-size="42" fill="${creative.accent}">GROWTH TOOL / ${creative.id}</text><text x="84" y="390" font-family="Arial, sans-serif" font-size="88" font-weight="700" fill="${creative.accent}">${headline}</text><text x="84" y="690" font-family="Arial, sans-serif" font-size="38" fill="${creative.accent}">${escapeXml(creative.subline)}</text><rect x="84" y="814" width="286" height="86" rx="43" fill="${creative.accent}"/><text x="126" y="870" font-family="Arial, sans-serif" font-size="31" fill="#ffffff">${escapeXml(creative.cta)}</text><text x="84" y="990" font-family="Arial, sans-serif" font-size="24" fill="${creative.accent}">${escapeXml(product.name)} · 확인된 정보 기반 초안</text></svg>`;
+    try {
+      const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+      const image = new Image();
+      const png = await new Promise<Blob>((resolve, reject) => {
+        image.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 1080;
+          canvas.height = 1080;
+          canvas.getContext("2d")?.drawImage(image, 0, 0);
+          canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG_RENDER_FAILED")), "image/png");
+        };
+        image.onerror = () => reject(new Error("SVG_RENDER_FAILED"));
+        image.src = svgUrl;
+      });
+      URL.revokeObjectURL(svgUrl);
+      const exportId = crypto.randomUUID();
+      const zip = new JSZip();
+      zip.file(`growth-tool-${creative.id}-${exportId}.png`, png);
+      zip.file("copy.txt", `${creative.headline}\n\n${creative.subline}\n${creative.cta}`);
+      zip.file("experiment.md", `# ${creative.id}안\n\n비교 변수: 헤드라인\n트렌드: ${selectedTrend?.title || "상품 중심"}\n상품: ${product.name}\n`);
+      zip.file("scene.json", JSON.stringify({ canvas: { width: 1080, height: 1080, colorSpace: "sRGB" }, creative, product: { name: product.name, price: product.price }, exportId }, null, 2));
+      zip.file("manifest.json", JSON.stringify({ exportId, createdAt: new Date().toISOString(), version: "mvp-1", assets: [`growth-tool-${creative.id}-${exportId}.png`, "copy.txt", "experiment.md", "scene.json"] }, null, 2));
+      const archive = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(archive);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `growth-tool-${creative.id}-${exportId}.zip`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice(`${creative.id}안 PNG와 실험 명세 ZIP을 만들었어요. 광고 집행 전 매체 가이드라인을 확인하세요.`);
+    } catch {
+      setNotice("PNG 파일을 만들지 못했어요. 이미지와 폰트가 모두 로드된 뒤 다시 시도하세요.");
+    }
   }
 
   function handleFile(event: ChangeEvent<HTMLInputElement>) {
